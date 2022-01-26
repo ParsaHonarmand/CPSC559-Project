@@ -1,32 +1,34 @@
 import java.io.*;
 import java.net.Socket;
-import java.util.HashMap;
 import java.util.Scanner;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Peer {
-    private Scanner keyboard = new Scanner(System.in);
-    HashMap<String, Integer> peersMap = new HashMap<>();
-    String address;
-    int port;
-    String teamName;
+    private ConcurrentHashMap<String, Peer> peersMap = new ConcurrentHashMap<>();
+    private String teamName;
+    private String address;
+    private int port;
+//    Peer[] peersSent = null;
 
-    Peer[] peersSent = null;
+    private String getTeamName() { return teamName; }
+    private String getAddress() { return address; }
+    private int getPort() { return port; }
 
-    String key() {
-        return teamName;
+    private void setTeamName(String teamName) {
+        this.teamName = teamName;
     }
-    public String toString() {
-        return key() + " " + address + ":" + port;
+    private void setAddress(String address) {
+        this.address = address;
+    }
+    private void setPort(int port) {
+        this.port = port;
     }
 
-    private String getID() {
-        System.out.print("Enter ID: ");
-        return keyboard.nextLine();
-    }
-
-    private String getTeamName() {
+    private String selectTeamName() {
+        Scanner keyboard = new Scanner(System.in);
         System.out.print("Enter team name: ");
-        return keyboard.nextLine();
+        setTeamName(keyboard.nextLine());
+        return getTeamName();
     }
 
     public String readFile() {
@@ -49,23 +51,25 @@ public class Peer {
     }
 
     public void getPeers(BufferedReader reader) throws IOException {
-        String numOfPeers = reader.readLine();
+        System.out.println("Getting peers info");
+        int numOfPeers = Integer.parseInt(reader.readLine());
         System.out.println(numOfPeers);
-        while (!reader.readLine().equals("\n") && !reader.readLine().equals("get report")) {
-            String peer = reader.readLine();
-            System.out.println("Peer " + peer);
-            String[] peerProperties = peer.split(":");
-            int port = Integer.parseInt(peerProperties[1]);
-            peersMap.put(peerProperties[0], port);
+
+        for (int i = 0; i < numOfPeers; i++) {
+            String line = reader.readLine();
+            System.out.println("Peer " + line);
+            String[] peerProperties = line.split(":");
+
+            Peer peer = new Peer();
+            peer.setTeamName(getTeamName());
+            peer.setAddress(peerProperties[0]);
+            peer.setPort(Integer.parseInt(peerProperties[1]));
+            peersMap.put(teamName, peer);
         }
         System.out.println(peersMap);
     }
 
     public void start() throws IOException {
-        Scanner keyboard = new Scanner(System.in);
-        int reqCounter = 0;
-        String teamName = "";
-        String id = "";
         Socket sock = new Socket("localhost", 55921);
 
         while (sock.isConnected()) {
@@ -75,21 +79,19 @@ public class Peer {
             String serverReqMsg = reader.readLine();
             System.out.println("Received from server: " + serverReqMsg);
             if (serverReqMsg.equals("get team name")) {
-                teamName += getTeamName() + "\n";
+                String teamName = selectTeamName() + "\n";
                 sock.getOutputStream().write(teamName.getBytes());
             } else if (serverReqMsg.equals("get code")) {
                 System.out.println("Requesting code");
                 String file = readFile() + "\n";
                 sock.getOutputStream().write(file.getBytes());
             } else if (serverReqMsg.equals("receive peers")) {
-                System.out.println("Getting peers info");
                 getPeers(reader);
             } else if (serverReqMsg.equals("get report")) {
                 System.out.println("Report request");
             } else if (serverReqMsg.equals("close")) {
                 sock.close();
             }
-            reqCounter++;
         }
         System.out.println("Goodbye...");
     }
