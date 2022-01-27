@@ -94,7 +94,7 @@ public class Client {
 
         Socket sock = new Socket(address, port);
 
-        while (sock.isConnected()) {
+        while (!sock.isClosed() && sock.isConnected()) {
             InputStream input = sock.getInputStream();
             BufferedReader reader = new BufferedReader(new InputStreamReader(input));
 
