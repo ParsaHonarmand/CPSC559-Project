@@ -8,7 +8,16 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Client {
     Scanner keyboard = new Scanner(System.in);
     private ConcurrentHashMap<String, Peer> peersMap = new ConcurrentHashMap<>();
+    private String serverAddress = "";
+    private int serverPort;
 //    Peer[] peersSent = null;
+
+    public void setServerAddress(String serverAddress) {
+        this.serverAddress = serverAddress;
+    }
+    public void setServerPort(int serverPort) {
+        this.serverPort = serverPort;
+    }
 
     private String selectTeamName() {
         System.out.print("Enter team name: ");
@@ -77,8 +86,11 @@ public class Client {
         System.out.println(peersMap);
     }
 
-    public void start() throws IOException {
-        Socket sock = new Socket("localhost", 55921);
+    public void start(String address, int port) throws IOException {
+        setServerAddress(address);
+        setServerPort(port);
+
+        Socket sock = new Socket(address, port);
 
         while (sock.isConnected()) {
             InputStream input = sock.getInputStream();
@@ -104,11 +116,22 @@ public class Client {
     }
 
     public static void main(String[] args) {
-        Client client = new Client();
-        try {
-            client.start();
-        } catch (IOException ioe) {
-            ioe.printStackTrace();
+        if (args.length == 2) {
+            try {
+                String address = args[0];
+                int port = Integer.parseInt(args[1]);
+                Client client = new Client();
+                try {
+                    client.start(address, port);
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
+                }
+            } catch (NumberFormatException e) {
+                System.err.println("Argument" + args[0] + " must be an integer.");
+                System.exit(1);
+            }
+        } else {
+            System.out.println("Usage: java Client <ip_address> <port>");
         }
     }
 }
