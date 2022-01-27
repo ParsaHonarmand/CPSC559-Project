@@ -49,7 +49,7 @@ public class Client {
             Scanner myReader = new Scanner(file);
             while (myReader.hasNextLine()) {
                 String line = myReader.nextLine();
-                data += line;
+                data += line + "\n";
             }
             myReader.close();
             System.out.println("Read source code for " + file.getName());
