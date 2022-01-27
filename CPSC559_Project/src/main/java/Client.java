@@ -119,22 +119,30 @@ public class Client {
     public String createReport(){
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         String report = peersMap.size() + "\n";
+        date = new Date();
 
-        for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
-            String teamName = entry.getKey();
-            Peer peer = entry.getValue();
-            report += peer.getAddress() + ":" + peer.getPort() + "\n";
+        if(peersMap.size() > 0){
+            for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
+                String teamName = entry.getKey();
+                Peer peer = entry.getValue();
+                report += peer.getAddress() + ":" + peer.getPort() + "\n";
+            }
+
+            System.out.println("DATE: " + date);
+            report += "1\n" + serverAddress + ":" + serverPort +
+                    (date != null ? "\n" + formatter.format(date) + "\n": "") +
+                    peersMap.size();
+
+            for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
+                String teamName = entry.getKey();
+                Peer peer = entry.getValue();
+                report += "\n" + peer.getAddress() + ":" + peer.getPort() + "\n";
+            }
         }
-
-        System.out.println("DATE: " + date);
-        report += "1\n" + serverAddress + ":" + serverPort +
-                (date != null ? "\n" + formatter.format(date) + "\n": "") +
-                peersMap.size();
-
-        for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
-            String teamName = entry.getKey();
-            Peer peer = entry.getValue();
-            report += "\n" + peer.getAddress() + ":" + peer.getPort() + "\n";
+        else{
+            report += "1\n" + serverAddress + ":" + serverPort +
+            "\n" + formatter.format(date) + "\n" +
+            peersMap.size() + "\n";
         }
 
         return report; 
