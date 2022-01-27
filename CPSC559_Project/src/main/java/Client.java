@@ -1,6 +1,8 @@
 // source code is multiple files
 import java.io.*;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -108,6 +110,25 @@ public class Client {
                 getPeers(reader);
             } else if (serverReqMsg.equals("get report")) {
                 System.out.println("Report request");
+                SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                Date date = new Date();
+
+                String report = Integer.toString(peersMap.size()) + "\n";
+
+                for(int i = 0; i < peersMap.size(); i++){
+                    report = report + peersMap.get("placeHolder_teamName").getAddress() + ":" + peersMap.get("placeHolder_teamName").getPort() + "\n";
+                }
+
+                report = report + "1" + "\n" + sock.getInetAddress().getHostAddress() + ":" + "55921" + "\n" + formatter.format(date) + "\n" + peersMap.size();
+
+                for(int i = 0; i < peersMap.size(); i++){
+                    report = report + "\n" + peersMap.get("placeHolder_teamName").getAddress() + ":" + peersMap.get("placeHolder_teamName").getPort() + "\n";
+                }
+
+                System.out.println(report);
+                sock.getOutputStream().write(report.getBytes());
+                sock.getOutputStream().flush();
+                System.out.println("Report sent to host.");
             } else if (serverReqMsg.equals("close")) {
                 sock.close();
             }
