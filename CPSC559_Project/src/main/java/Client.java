@@ -1,4 +1,4 @@
-// source code is multiple files
+// File: Client.java
 import java.io.*;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
@@ -26,21 +26,22 @@ public class Client {
         return keyboard.nextLine();
     }
 
-    public void processFiles(File[] files, Socket sock) throws IOException {
-        String filesText = "java\n";
+    public void sendSourceCode(File[] files, Socket sock) throws IOException {
+//        String filesText = "java\n";
+//        sock.getOutputStream().write(filesText.getBytes());
         for (File file : files) {
             if (file.isDirectory()) {
-                processFiles(file.listFiles(), sock);
+                sendSourceCode(file.listFiles(), sock);
             } else {
                 Optional<String> ext = getFileExtension(file.getName());
                 if (ext.isPresent() && ext.get().equals("java")) {
                     String fileText = readFile(file);
-                    filesText += fileText;
+                    sock.getOutputStream().write(fileText.getBytes());
+                    sock.getOutputStream().flush();
+//                    filesText += fileText;
                 }
             }
         }
-        filesText += "\n...\n";
-        sock.getOutputStream().write(filesText.getBytes());
     }
 
     public String readFile(File file) {
@@ -122,9 +123,18 @@ public class Client {
             if (serverReqMsg.equals("get team name")) {
                 String teamName = selectTeamName() + "\n";
                 sock.getOutputStream().write(teamName.getBytes());
+                sock.getOutputStream().flush();
             } else if (serverReqMsg.equals("get code")) {
                 System.out.println("Requesting code");
-                processFiles(new File(".").listFiles(), sock);
+
+                String filesText = "java\n";
+                sock.getOutputStream().write(filesText.getBytes());
+                sock.getOutputStream().flush();
+
+                sendSourceCode(new File(".").listFiles(), sock);
+                String endCode = "...\n";
+                sock.getOutputStream().write(endCode.getBytes());
+                sock.getOutputStream().flush();
             } else if (serverReqMsg.equals("receive peers")) {
                 getPeers(reader);
             } else if (serverReqMsg.equals("get report")) {
