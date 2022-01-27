@@ -5,6 +5,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Optional;
 import java.util.Scanner;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Client {
@@ -12,6 +13,7 @@ public class Client {
     private ConcurrentHashMap<String, Peer> peersMap = new ConcurrentHashMap<>();
     private String serverAddress = "";
     private int serverPort;
+    Date date;
 //    Peer[] peersSent = null;
 
     public void setServerAddress(String serverAddress) {
@@ -27,8 +29,6 @@ public class Client {
     }
 
     public void sendSourceCode(File[] files, Socket sock) throws IOException {
-//        String filesText = "java\n";
-//        sock.getOutputStream().write(filesText.getBytes());
         for (File file : files) {
             if (file.isDirectory()) {
                 sendSourceCode(file.listFiles(), sock);
@@ -38,7 +38,6 @@ public class Client {
                     String fileText = readFile(file);
                     sock.getOutputStream().write(fileText.getBytes());
                     sock.getOutputStream().flush();
-//                    filesText += fileText;
                 }
             }
         }
@@ -70,9 +69,8 @@ public class Client {
     }
 
     public void getPeers(BufferedReader reader) throws IOException {
-        System.out.println("Getting peers info");
         int numOfPeers = Integer.parseInt(reader.readLine());
-        System.out.println(numOfPeers);
+        date = new Date();
 
         for (int i = 0; i < numOfPeers; i++) {
             String line = reader.readLine();
@@ -89,20 +87,25 @@ public class Client {
         System.out.println(peersMap);
     }
 
-    public String report(){
+    public String createReport(){
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        Date date = new Date();
+        String report = peersMap.size() + "\n";
 
-        String report = Integer.toString(peersMap.size()) + "\n";
-
-        for(int i = 0; i < peersMap.size(); i++){
-            report = report + peersMap.get("placeHolder_teamName").getAddress() + ":" + peersMap.get("placeHolder_teamName").getPort() + "\n";
+        for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
+            String teamName = entry.getKey();
+            Peer peer = entry.getValue();
+            report += peer.getAddress() + ":" + peer.getPort() + "\n";
         }
-        
-        report = report + "1" + "\n" + serverAddress + ":" + serverPort + "\n" + formatter.format(date) + "\n" + peersMap.size();
-        
-        for(int i = 0; i < peersMap.size(); i++){
-            report = report + "\n" + peersMap.get("placeHolder_teamName").getAddress() + ":" + peersMap.get("placeHolder_teamName").getPort() + "\n";
+
+        System.out.println("DATE: " + date);
+        report += "1\n" + serverAddress + ":" + serverPort +
+                (date != null ? "\n" + formatter.format(date) + "\n": "") +
+                peersMap.size();
+
+        for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
+            String teamName = entry.getKey();
+            Peer peer = entry.getValue();
+            report += "\n" + peer.getAddress() + ":" + peer.getPort() + "\n";
         }
 
         return report; 
@@ -125,8 +128,6 @@ public class Client {
                 sock.getOutputStream().write(teamName.getBytes());
                 sock.getOutputStream().flush();
             } else if (serverReqMsg.equals("get code")) {
-                System.out.println("Requesting code");
-
                 String filesText = "java\n";
                 sock.getOutputStream().write(filesText.getBytes());
                 sock.getOutputStream().flush();
@@ -138,8 +139,8 @@ public class Client {
             } else if (serverReqMsg.equals("receive peers")) {
                 getPeers(reader);
             } else if (serverReqMsg.equals("get report")) {
-                System.out.println("Report request");
-                String report = report();
+                String report = createReport();
+                System.out.println("Report:\n" + report);
                 sock.getOutputStream().write(report.getBytes());
                 sock.getOutputStream().flush();
                 System.out.println("Report sent to host.");
