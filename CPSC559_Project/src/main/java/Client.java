@@ -98,8 +98,6 @@ public class Client {
             // check to see if this peer already exists or not to handle duplication
             for (Peer existingPeer : peersMap.values()) {
                 String peerLocation = existingPeer.getAddress() + ":" + existingPeer.getPort();
-                System.out.println("Existing Peer: " + peerLocation);
-                System.out.println("Incoming Peer: " + line);
                 if (peerLocation.equals(line)) {
                     repeated = true;
                     break;
@@ -140,8 +138,6 @@ public class Client {
                 Peer peer = entry.getValue();
                 report += peer.getAddress() + ":" + peer.getPort() + "\n";
             }
-
-            System.out.println("DATE: " + date);
 
             //Add number of sources, source address, source port, date, 
             //number of peers for that source
