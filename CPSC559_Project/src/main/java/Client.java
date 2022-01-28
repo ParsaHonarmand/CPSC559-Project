@@ -11,18 +11,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Client {
     Scanner keyboard = new Scanner(System.in);
     private ConcurrentHashMap<String, Peer> peersMap = new ConcurrentHashMap<>();
-    private String serverAddress = "";
-    private int serverPort;
     Date date;
+    int numOfReceiveReqs;
 //    Peer[] peersSent = null;
 
-    //Setter for server Address and Ports used for report
-    public void setServerAddress(String serverAddress) {
-        this.serverAddress = serverAddress;
-    }
-    public void setServerPort(int serverPort) {
-        this.serverPort = serverPort;
-    }
 
     //Prompt for team name
     private String selectTeamName() {
@@ -101,13 +93,29 @@ public class Client {
             String line = reader.readLine();
             System.out.println("Peer " + line);
             String[] peerProperties = line.split(":"); //Split address:port
+            boolean repeated = false;
 
-            Peer peer = new Peer(
-                    "placeHolder_teamName", //Team name for now until we are assigned one
-                    peerProperties[0],
-                    Integer.parseInt(peerProperties[1])
-            );
-            peersMap.put(peer.getTeamName(), peer); //Populate hashmap using team name as key
+            // check to see if this peer already exists or not to handle duplication
+            for (Peer existingPeer : peersMap.values()) {
+                String peerLocation = existingPeer.getAddress() + ":" + existingPeer.getPort();
+                System.out.println("Existing Peer: " + peerLocation);
+                System.out.println("Incoming Peer: " + line);
+                if (peerLocation.equals(line)) {
+                    repeated = true;
+                    break;
+                }
+            }
+
+            // if peer is not duplicate, add to map of peers
+            if (!repeated) {
+                Peer peer = new Peer(
+                        "placeHolder_teamName" + numOfReceiveReqs, //Team name for now until we are assigned one
+                        peerProperties[0],
+                        Integer.parseInt(peerProperties[1])
+                );
+                peersMap.put(peer.getTeamName(), peer); //Populate hashmap using team name as key
+                numOfReceiveReqs++;
+            }
         }
         System.out.println(peersMap);
     }
@@ -117,7 +125,7 @@ public class Client {
      * the date that this map's data was retrieved
      * @return the report as a string
      */
-    public String createReport(){
+    public String createReport(Socket sock){
 
         //Used to record report date 
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -139,14 +147,14 @@ public class Client {
             //number of peers for that source
             //In this case we will only have 1 source so this 
             //implementation will change to accommodation more sources
-            report += "1\n" + serverAddress + ":" + serverPort +
+            report += "1\n" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() +
                     "\n" + formatter.format(date) + "\n" +
-                    peersMap.size();
+                    peersMap.size() + "\n";
 
             for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
                 String teamName = entry.getKey();
                 Peer peer = entry.getValue();
-                report += "\n" + peer.getAddress() + ":" + peer.getPort() + "\n";
+                report += peer.getAddress() + ":" + peer.getPort() + "\n";
             }
         }
         else{ //If no peers are detected
@@ -169,9 +177,6 @@ public class Client {
      * @throws IOException
      */
     public void start(String address, int port) throws IOException {
-        setServerAddress(address);
-        setServerPort(port);
-
         Socket sock = new Socket(address, port);
 
         while (!sock.isClosed() && sock.isConnected()) {
@@ -196,7 +201,7 @@ public class Client {
             } else if (serverReqMsg.equals("receive peers")) {
                 getPeers(reader);
             } else if (serverReqMsg.equals("get report")) {
-                String report = createReport();
+                String report = createReport(sock);
                 System.out.println("Report:\n" + report);
                 sock.getOutputStream().write(report.getBytes());
                 sock.getOutputStream().flush();
