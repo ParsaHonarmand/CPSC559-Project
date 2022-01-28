@@ -37,8 +37,6 @@ public class Client {
      * @param sock socket connection object
      * @throws IOException
      */
-
-    //Sending code to the registry upon "get code" request
     public void sendSourceCode(File[] files, Socket sock) throws IOException {
         for (File file : files) {
             if (file.isDirectory()) {   //If a folder is detected then extract nested files
@@ -99,7 +97,6 @@ public class Client {
     public void getPeers(BufferedReader reader) throws IOException {
         int numOfPeers = Integer.parseInt(reader.readLine());
         date = new Date();
-
         for (int i = 0; i < numOfPeers; i++) {
             String line = reader.readLine();
             System.out.println("Peer " + line);
@@ -125,9 +122,8 @@ public class Client {
         //Used to record report date 
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         String report = peersMap.size() + "\n"; //Initial state of report composition in string form
-        date = new Date();
 
-        //If peers are recieved
+        // If peers are previously received
         if(peersMap.size() > 0){
 
             //Add all peer details
@@ -142,9 +138,9 @@ public class Client {
             //Add number of sources, source address, source port, date, 
             //number of peers for that source
             //In this case we will only have 1 source so this 
-            //implementation will change to accomodate more sources
+            //implementation will change to accommodation more sources
             report += "1\n" + serverAddress + ":" + serverPort +
-                    (date != null ? "\n" + formatter.format(date) + "\n": "") +
+                    "\n" + formatter.format(date) + "\n" +
                     peersMap.size();
 
             for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
