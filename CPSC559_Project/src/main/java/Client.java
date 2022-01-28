@@ -16,6 +16,7 @@ public class Client {
     Date date;
 //    Peer[] peersSent = null;
 
+    //Setter for server Address and Ports used for report
     public void setServerAddress(String serverAddress) {
         this.serverAddress = serverAddress;
     }
@@ -23,6 +24,7 @@ public class Client {
         this.serverPort = serverPort;
     }
 
+    //Prompt for team name
     private String selectTeamName() {
         System.out.print("Enter team name: ");
         return keyboard.nextLine();
@@ -35,15 +37,17 @@ public class Client {
      * @param sock socket connection object
      * @throws IOException
      */
+
+    //Sending code to the registry upon "get code" request
     public void sendSourceCode(File[] files, Socket sock) throws IOException {
         for (File file : files) {
-            if (file.isDirectory()) {
+            if (file.isDirectory()) {   //If a folder is detected then extract nested files
                 sendSourceCode(file.listFiles(), sock);
-            } else {
+            } else {                    //If a java file is detected then extract source code
                 Optional<String> ext = getFileExtension(file.getName());
                 if (ext.isPresent() && ext.get().equals("java")) {
                     String fileText = readFile(file);
-                    sock.getOutputStream().write(fileText.getBytes());
+                    sock.getOutputStream().write(fileText.getBytes()); //Send to registry 
                     sock.getOutputStream().flush();
                 }
             }
@@ -55,17 +59,17 @@ public class Client {
      * @param file
      * @return the string of the source code that's been read
      */
-    public String readFile(File file) {
+    public String readFile(File file) { //Used in sendSourceCode processes to read files
         String data = "";
         try {
             Scanner myReader = new Scanner(file);
-            while (myReader.hasNextLine()) {
+            while (myReader.hasNextLine()) {    //Extract code line by line given a java file input
                 String line = myReader.nextLine();
                 data += line + "\n";
             }
             myReader.close();
             System.out.println("Read source code for " + file.getName());
-            return data + "\n";
+            return data + "\n"; //Return entire file code to calling method
         } catch (FileNotFoundException e) {
             System.out.println("An error occurred.");
             e.printStackTrace();
@@ -99,14 +103,14 @@ public class Client {
         for (int i = 0; i < numOfPeers; i++) {
             String line = reader.readLine();
             System.out.println("Peer " + line);
-            String[] peerProperties = line.split(":");
+            String[] peerProperties = line.split(":"); //Split address:port
 
             Peer peer = new Peer(
-                    "placeHolder_teamName",
+                    "placeHolder_teamName", //Team name for now until we are assigned one
                     peerProperties[0],
                     Integer.parseInt(peerProperties[1])
             );
-            peersMap.put(peer.getTeamName(), peer);
+            peersMap.put(peer.getTeamName(), peer); //Populate hashmap using team name as key
         }
         System.out.println(peersMap);
     }
@@ -117,11 +121,16 @@ public class Client {
      * @return the report as a string
      */
     public String createReport(){
+
+        //Used to record report date 
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        String report = peersMap.size() + "\n";
+        String report = peersMap.size() + "\n"; //Initial state of report composition in string form
         date = new Date();
 
+        //If peers are recieved
         if(peersMap.size() > 0){
+
+            //Add all peer details
             for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
                 String teamName = entry.getKey();
                 Peer peer = entry.getValue();
@@ -129,6 +138,11 @@ public class Client {
             }
 
             System.out.println("DATE: " + date);
+
+            //Add number of sources, source address, source port, date, 
+            //number of peers for that source
+            //In this case we will only have 1 source so this 
+            //implementation will change to accomodate more sources
             report += "1\n" + serverAddress + ":" + serverPort +
                     (date != null ? "\n" + formatter.format(date) + "\n": "") +
                     peersMap.size();
@@ -139,10 +153,14 @@ public class Client {
                 report += "\n" + peer.getAddress() + ":" + peer.getPort() + "\n";
             }
         }
-        else{
+        else{ //If no peers are detected
+            /*
             report += "1\n" + serverAddress + ":" + serverPort +
             "\n" + formatter.format(date) + "\n" +
             peersMap.size() + "\n";
+            */
+
+            report += "0\n";
         }
 
         return report; 
