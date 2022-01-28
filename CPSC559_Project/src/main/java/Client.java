@@ -174,12 +174,11 @@ public class Client {
      */
     public void start(String address, int port) throws IOException {
         Socket sock = new Socket(address, port);
-
-        while (!sock.isClosed() && sock.isConnected()) {
-            InputStream input = sock.getInputStream();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-
-            String serverReqMsg = reader.readLine();
+        InputStream input = sock.getInputStream();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+        String serverReqMsg = "";
+        while (!sock.isClosed() && sock.isConnected() && (
+                serverReqMsg = reader.readLine()) != null) {
             System.out.println("Received from server: " + serverReqMsg);
             if (serverReqMsg.equals("get team name")) {
                 String teamName = selectTeamName() + "\n";
