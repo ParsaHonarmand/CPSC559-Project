@@ -202,6 +202,12 @@ public class Client {
                 sock.getOutputStream().flush();
             } else if (serverReqMsg.equals("receive peers")) {
                 getPeers(reader);
+                
+                /*
+                PeerCom peerCom = new PeerCom(peersMap, address, port);
+                peerCom.run();
+                */
+            
             } else if (serverReqMsg.equals("get report")) {
                 String report = createReport(sock);
                 System.out.println("Report:\n" + report);
@@ -221,22 +227,26 @@ public class Client {
                 byte[] buf = new byte[256];
                 DatagramPacket packetReceiveUDP = new DatagramPacket(buf, buf.length);
                 serverToPeerUDP.receive(packetReceiveUDP);
-                String response = new String(packetReceive.getData());
+                String response = new String(packetReceiveUDP.getData());
+                
+                if(response == "stop"){
+                    String report = createReport(sock);
+                    System.out.println("Report:\n" + report);
+                    sock.getOutputStream().write(report.getBytes());
+                    sock.getOutputStream().flush();
+                    System.out.println("Report sent to host.");
+        
+                    sock.close();
+                    serverToPeerUDP.close();
+                }
             }
             catch(IOException e){
                 System.out.println("Did not recieve UDP packet from server to peer "+port);
             }
 
-            if(response == "stop"){
-                String report = createReport(sock);
-                System.out.println("Report:\n" + report);
-                sock.getOutputStream().write(report.getBytes());
-                sock.getOutputStream().flush();
-                System.out.println("Report sent to host.");
+            
 
-                sock.close();
-                serverToPeerUDP.close();
-            }
+            
         }
         System.out.println("Goodbye...");
     }
