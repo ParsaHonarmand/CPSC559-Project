@@ -16,15 +16,41 @@ public class PeerCom implements Runnable{
     ConcurrentHashMap<String, Peer> peersMap;
 	Peer[] allPeers;
     Peer[] currPeers;
+    Peer peerToAdd;
     String[] peerFormatter;
     boolean duplicateDetect = false;
+    String teamNameGeneral;
     String address;
+    String newPeerAddress;
     int port;
+    int newPeerPort;
+
 
     public PeerCom(ConcurrentHashMap<String, Peer> peersMap, String address, int port) {
         this.peersMap = peersMap;
         this.address = address;
         this.port = port;
+    }
+
+    public PeerCom(String address, int port) {
+        this.newPeerAddress = address;
+        this.newPeerPort = port;
+    }
+
+    public void updatePeerList(String newPeerAddress, int newPeerPort){
+        for(Peer p : allPeers){
+            if(!(p.getAddress() == newPeerAddress && p.getPort() == newPeerPort)){
+                duplicateDetect = true;
+                teamNameGeneral = p.getTeamName();
+            }
+        }
+        if(duplicateDetect == false){
+            peersMap.put(teamNameGeneral, new Peer(teamNameGeneral, newPeerAddress, newPeerPort));
+            allPeers = Arrays.copyOf(allPeers, allPeers.length+1);
+            allPeers[allPeers.length-1] = new Peer(teamNameGeneral, newPeerAddress, newPeerPort);
+        }
+
+        currPeers = Arrays.copyOf(allPeers, allPeers.length);
     }
     
     @Override
@@ -54,43 +80,51 @@ public class PeerCom implements Runnable{
         Random r = new Random();
         while(true){
             int random = r.nextInt(peerFormatter.length);
+            int randomReciever = r.nextInt(peerFormatter.length);
             String pickedPeer = peerFormatter[random];
+            String pickerPeerReciever = peerFormatter[randomReciever];
             String[] peerProperties = pickedPeer.split(":");
+            String[] peerRecieverProperties = pickerPeerReciever.split(":");
             
             try{
             DatagramSocket PeerSendUDP = new DatagramSocket();
 
-            InetAddress addressUDP = InetAddress.getByName(peerProperties[1]);
-            byte[] buf = pickedPeer.getBytes();
-            DatagramPacket packetSend = new DatagramPacket(buf, buf.length, addressUDP, Integer.parseInt(peerProperties[2]));
+            InetAddress addressRecieverUDP = InetAddress.getByName(peerRecieverProperties[1]);
+            String str = "peer" + peerProperties[1] + ":" + peerProperties[2];
+            byte[] buf = str.getBytes();
+            DatagramPacket packetSend = new DatagramPacket(buf, buf.length, addressRecieverUDP, Integer.parseInt(peerRecieverProperties[2]));
             PeerSendUDP.send(packetSend);
 
+            /*
             DatagramSocket PeerRecieveUDP = new DatagramSocket(port);
 
             byte[] buff = new byte[256];
             DatagramPacket packetReceive = new DatagramPacket(buff, buff.length);
             PeerRecieveUDP.receive(packetReceive);
             String response = new String(packetReceive.getData());
-            if(response != null){
+            if(response != null && response.substring(0,4) == "peer"){
                 System.out.println(response+" recieved by "+address+":"+port);
-                String[] responseSplit = response.split(":");
+                String responseR = response.substring(4);
+                String[] responseSplit = responseR.split(":");
 
                 for(Peer p : allPeers){
-                    if(!(p.getAddress() == responseSplit[1] && p.getPort() == Integer.parseInt(responseSplit[2]) && p.getTeamName() == responseSplit[0])){
+                    if(!(p.getAddress() == responseSplit[0] && p.getPort() == Integer.parseInt(responseSplit[1]))){
                         duplicateDetect = true;
+                        teamNameGeneral = p.getTeamName();
                     }
                 }
                 if(duplicateDetect == false){
-                    peersMap.put(responseSplit[0], new Peer(responseSplit[0], responseSplit[1], Integer.parseInt(responseSplit[2])));
+                    peersMap.put(teamNameGeneral, new Peer(teamNameGeneral, responseSplit[0], Integer.parseInt(responseSplit[1])));
                     allPeers = Arrays.copyOf(allPeers, allPeers.length+1);
-                    allPeers[allPeers.length-1] = new Peer(responseSplit[0], responseSplit[1], Integer.parseInt(responseSplit[2]));
+                    allPeers[allPeers.length-1] = new Peer(teamNameGeneral, responseSplit[0], Integer.parseInt(responseSplit[1]));
                 }  
             }
 
             currPeers = Arrays.copyOf(allPeers, allPeers.length);
+            */
             
             PeerSendUDP.close();
-            PeerRecieveUDP.close();
+            //PeerRecieveUDP.close();
 
             TimeUnit.SECONDS.sleep(10);
             }
@@ -105,15 +139,14 @@ public class PeerCom implements Runnable{
 }
 
 /*
-                DatagramSocket clientUDP = new DatagramSocket();
-                DatagramSocket serverUDP = new DatagramSocket(4160);
+            DatagramSocket clientUDP = new DatagramSocket();
 
-                InetAddress addressUDP = InetAddress.getByName(address);
-                String str = "stop";
-                byte[] buf = str.getBytes();
-                DatagramPacket packetSend = new DatagramPacket(buf, buf.length, addressUDP, 4160);
-                clientUDP.send(packetSend);
-                clientUDP.close();
+            InetAddress addressUDP = InetAddress.getByName(address);
+            String str = "stop";
+            byte[] buf = str.getBytes();
+            DatagramPacket packetSend = new DatagramPacket(buf, buf.length, addressUDP, 4160);
+            clientUDP.send(packetSend);
+            clientUDP.close();
                 
 
             DatagramSocket PeerSendUDP = new DatagramSocket(Integer.parseInt(peerProperties[2]));

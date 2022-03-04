@@ -185,6 +185,11 @@ public class Client {
         InputStream input = sock.getInputStream();
         BufferedReader reader = new BufferedReader(new InputStreamReader(input));
         String serverReqMsg = "";
+
+        //PeerCom thread initialize
+        PeerCom peerCom = new PeerCom(peersMap, address, port);
+        Thread peerComThread = new Thread(peerCom);
+
         while (!sock.isClosed() && sock.isConnected() && !serverToPeerUDP.isClosed() && serverToPeerUDP.isConnected() && (serverReqMsg = reader.readLine()) != null) {
             System.out.println("Received from server: " + serverReqMsg);
             if (serverReqMsg.equals("get team name")) {
@@ -203,10 +208,8 @@ public class Client {
             } else if (serverReqMsg.equals("receive peers")) {
                 getPeers(reader);
                 
-                /*
-                PeerCom peerCom = new PeerCom(peersMap, address, port);
-                peerCom.run();
-                */
+                //Start sending other peers that this peer exists
+                peerComThread.start();
             
             } else if (serverReqMsg.equals("get report")) {
                 String report = createReport(sock);
@@ -222,7 +225,54 @@ public class Client {
                 sock.getOutputStream().flush();
                 System.out.println("Sent peer " + address + ":" + port + " location to registry");
             }
+
+            //Starting recieving UDP messages from other peers 
+            try{
+                byte[] buf = new byte[256];
+                DatagramPacket packetReceiveUDP = new DatagramPacket(buf, buf.length);
+                serverToPeerUDP.receive(packetReceiveUDP);
+                String response = new String(packetReceiveUDP.getData());
+                
+                //Initializing UDP message handling thread
+                UDP_Handling udpInput = new UDP_Handling(response, sock);
+                Thread udp_thread = new Thread(udpInput);
+
+                if(response != null && (response.substring(0,4) == "peer" || response.substring(0,4) == "snip" || response.substring(0,4) == "stop")){
+                    //If stop message is received then make report (still need to modify) and then join threads and stop program
+                    if(response.substring(0,4) == "stop"){
+                        String report = createReport(sock);
+                        System.out.println("Report:\n" + report);
+                        sock.getOutputStream().write(report.getBytes());
+                        sock.getOutputStream().flush();
+                        System.out.println("Report sent to host.");
+                        
+                        try {
+                            udp_thread.join();
+                            peerComThread.join();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        serverToPeerUDP.close();
+                        sock.close();
+                    }
+                    else{
+    
+                        udp_thread.start();
+                        try {
+                            udp_thread.join();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                } 
+            }
+            catch(IOException e){
+                e.printStackTrace();
+            }
+
             
+            
+            /*
             try{
                 byte[] buf = new byte[256];
                 DatagramPacket packetReceiveUDP = new DatagramPacket(buf, buf.length);
@@ -243,6 +293,7 @@ public class Client {
             catch(IOException e){
                 System.out.println("Did not recieve UDP packet from server to peer "+port);
             }
+            */
 
             
 
