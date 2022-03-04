@@ -78,9 +78,11 @@ public class PeerCom implements Runnable{
         }
 
         String msgSenderAddress = packet.getSocketAddress().toString();
+        String[] address = msgSenderAddress.split("/");
         String newSnippet = msgTimeStamp + snipContent + " " + msgSenderAddress;
         System.out.println("Snippet Received: " + newSnippet);
         snippets.add(newSnippet);
+        addPeer(address[1]);
     }
 
     private void addPeer(String address) {

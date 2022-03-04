@@ -3,10 +3,7 @@
 import java.io.*;
 import java.net.*;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Optional;
-import java.util.Scanner;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Client {
@@ -175,7 +172,10 @@ public class Client {
      * @throws IOException
      */
     public void start(String address, int port, String teamName) throws IOException {
-        DatagramSocket udpServer = new DatagramSocket(3000, InetAddress.getByName("localhost"));
+        Random r = new Random();
+        int random = r.nextInt(2000);
+        System.out.println(random);
+        DatagramSocket udpServer = new DatagramSocket(random ,InetAddress.getByName("localhost"));
 //        InetSocketAddress addressUDP = new InetSocketAddress(address, port);
 //        udpServer.bind(null);
 
