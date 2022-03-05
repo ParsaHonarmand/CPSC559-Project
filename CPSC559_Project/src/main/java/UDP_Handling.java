@@ -18,7 +18,6 @@ public class UDP_Handling implements Runnable{
 
     @Override
     public void run() {    
-            Client c = new Client();
             if(response.substring(0,4) == "peer"){
                 String responseR = response.substring(4);
                 String[] peerToAddPrperties = responseR.split(":");
