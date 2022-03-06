@@ -19,14 +19,8 @@ public class PeerCom implements Runnable{
     private DatagramSocket udpServer;
 
     private ConcurrentHashMap<String, Peer> peersMap;
-    private ConcurrentHashMap<String, Peer> currentPeers;
+    private ConcurrentHashMap<String, Peer> allPeers;
 
-	private ArrayList<Peer> allPeers = new ArrayList<Peer>();
-    private ArrayList<Peer> currPeers = new ArrayList<Peer>();
-
-    private boolean duplicateDetect = false;
-
-    private String teamNameGeneral;
     private String newPeerAddress;
     private int newPeerPort;
 
@@ -36,7 +30,7 @@ public class PeerCom implements Runnable{
 
     public PeerCom(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer) {
         this.peersMap = peersMap;
-        this.currentPeers = peersMap;
+        this.allPeers = peersMap;
         this.udpServer = udpServer;
     }
 
@@ -44,6 +38,8 @@ public class PeerCom implements Runnable{
         this.newPeerAddress = address;
         this.newPeerPort = port;
     }
+
+    public ConcurrentHashMap<String, Peer> getAllPeers(){ return allPeers; }
 
 //    public void updatePeerList(String newPeerAddress, int newPeerPort){
 //        for(Peer p : allPeers){
@@ -89,6 +85,9 @@ public class PeerCom implements Runnable{
 
     private void addPeer(String address) {
         boolean isDuplicate = false;
+        boolean isDuplicateAllPeers = false;
+        LocalDateTime myDateObj = LocalDateTime.now();
+
         for (Entry<String, Peer> entry : peersMap.entrySet()) {
             Peer existingPeer = entry.getValue();
             if (address.equals(existingPeer.getAddress() + ":" + existingPeer.getPort())) {
@@ -97,16 +96,26 @@ public class PeerCom implements Runnable{
             }
         }
 
+        for (Entry<String, Peer> entry : allPeers.entrySet()) {
+            Peer existingPeer = entry.getValue();
+            if (address.equals(existingPeer.getAddress() + ":" + existingPeer.getPort())) {
+                isDuplicateAllPeers = true;
+                break;
+            }
+        }
+
         if(isDuplicate == false){
-            LocalDateTime myDateObj = LocalDateTime.now();
+            
             String arbitraryTeamName = "someTeamName" + arbitraryNum++;
             String[] addressArr = address.split(":");
 
             String socketAddr = addressArr[0];
             int port = Integer.parseInt(addressArr[1]);
             Peer newPeer = new Peer(arbitraryTeamName, socketAddr, port, myDateObj);
-
-            peersMap.put(arbitraryTeamName, newPeer);
+            
+            if(isDuplicateAllPeers == false){
+                allPeers.put(arbitraryTeamName, newPeer);
+            }
         }
     }
 
