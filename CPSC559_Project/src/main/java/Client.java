@@ -3,6 +3,7 @@
 import java.io.*;
 import java.net.*;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -108,9 +109,11 @@ public class Client {
 
             // if peer is not duplicate, add to map of peers
             if (!repeated) {
+                LocalDateTime myDateObj = LocalDateTime.now();
+
                 Peer peer = new Peer("placeHolder_teamName" + numOfReceiveReqs, // Team name for now until we are
                                                                                 // assigned one
-                        peerProperties[0], Integer.parseInt(peerProperties[1]));
+                        peerProperties[0], Integer.parseInt(peerProperties[1]), myDateObj);
                 peersMap.put(peer.getTeamName(), peer); // Populate hashmap using team name as key
                 numOfReceiveReqs++;
             }

@@ -4,6 +4,8 @@
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.util.ArrayList;
@@ -96,14 +98,35 @@ public class PeerCom implements Runnable{
         }
 
         if(isDuplicate == false){
+            LocalDateTime myDateObj = LocalDateTime.now();
             String arbitraryTeamName = "someTeamName" + arbitraryNum++;
             String[] addressArr = address.split(":");
 
             String socketAddr = addressArr[0];
             int port = Integer.parseInt(addressArr[1]);
-            Peer newPeer = new Peer(arbitraryTeamName, socketAddr, port);
+            Peer newPeer = new Peer(arbitraryTeamName, socketAddr, port, myDateObj);
 
             peersMap.put(arbitraryTeamName, newPeer);
+        }
+    }
+
+    private void refreshPeerList(){
+        for (Entry<String, Peer> entry : peersMap.entrySet()) {
+            Peer existingPeer = entry.getValue();
+            LocalDateTime lastNoticed = existingPeer.getLastNoticed();
+            LocalDateTime currentTime = LocalDateTime.now();
+            LocalDateTime expiryTime = lastNoticed.plusHours(2);
+
+            int nowToLastNoticed = currentTime.compareTo(lastNoticed);
+            int nowToExpiry = currentTime.compareTo(expiryTime);
+
+            
+            if((nowToLastNoticed > 0 && nowToExpiry > 0) || (nowToLastNoticed < 0 && nowToExpiry > 0)){
+                peersMap.remove(entry.getKey());
+            }else if(nowToLastNoticed >= 0 && nowToExpiry <= 0){
+                //Keep Peer
+            }
+            
         }
     }
 
@@ -127,6 +150,7 @@ public class PeerCom implements Runnable{
                     String request = messages[0].substring(0, 4);
                     if (request.equals("peer")) {
                         handlePeerMessage(message, packet);
+                        refreshPeerList();
                     }
                     else if (request.equals("snip")) {
                         handleSnipMessage(messages, packet);
@@ -143,6 +167,15 @@ public class PeerCom implements Runnable{
             }
         }
     }
+
+/*
+    LocalDateTime myDateObj = LocalDateTime.now();
+    System.out.println("Before formatting: " + myDateObj);
+    DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+
+    String formattedDate = myDateObj.format(myFormatObj);
+*/
+
 //        int i = 0;
 //        for (Entry<String, Peer> entry : peersMap.entrySet()) {
 //            String teamName = entry.getKey();
