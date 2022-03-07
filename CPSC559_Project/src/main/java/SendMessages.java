@@ -3,6 +3,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
@@ -12,7 +13,11 @@ import java.util.concurrent.TimeUnit;
 
 public class SendMessages implements Runnable {
     DatagramSocket udpSocket;
+    String peersSendingLog = ""; 
     ConcurrentHashMap<String, Peer> peers;
+    ConcurrentHashMap<String, Peer> peersSent;
+    ConcurrentHashMap<String, Peer> peersSending;
+
     int timeStamp;
 
     public SendMessages(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer) {
@@ -20,6 +25,12 @@ public class SendMessages implements Runnable {
         this.timeStamp = 0;
         this.udpSocket = udpServer;
     }
+
+    public ConcurrentHashMap<String, Peer> getPeersSent(){ return peersSent; }
+
+    public ConcurrentHashMap<String, Peer> getPeersSending(){ return peersSending; }
+
+    public String getPeersSendingLog(){ return peersSendingLog; }
 
     private void sendSnippet() throws java.io.IOException {
         Scanner keyboard = new Scanner(System.in);
@@ -35,7 +46,25 @@ public class SendMessages implements Runnable {
         }
     }
 
-    private void sendPeer() throws java.io.IOException, InterruptedException{ 
+    private void addPeerToSendLog(Peer randomSendingPeer, Peer receivingPeer, LocalDateTime timeSent){
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String formattedDateTime = timeSent.format(formatter);
+        if(peersSendingLog == ""){
+            peersSendingLog = Integer.toString(peersSent.size()) + "\n" + 
+            randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort() + " " + 
+            receivingPeer.getAddress() + ":" + receivingPeer.getPort() + 
+            formattedDateTime + "\n";
+        }
+        else{
+            peersSendingLog = peersSendingLog +
+            Integer.toString(peersSent.size()) + "\n" + 
+            randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort() + " " + 
+            receivingPeer.getAddress() + ":" + receivingPeer.getPort() + 
+            formattedDateTime + "\n";
+        }
+    }
+
+    private void sendPeer(int counter) throws java.io.IOException, InterruptedException{ 
         TimeUnit.SECONDS.sleep(7);
 
         Random r = new Random();
@@ -45,12 +74,12 @@ public class SendMessages implements Runnable {
         LocalDateTime myDateObj = LocalDateTime.now();
         
         Peer receivingPeer = new Peer("", "", 0, myDateObj);
-        Peer randomPeer = new Peer("", "", 0, myDateObj);
+        Peer randomSendingPeer = new Peer("", "", 0, myDateObj);
 
         int i = 0;
         for (Entry<String, Peer> entry : peers.entrySet()) {
             if (i == random) {
-                randomPeer = entry.getValue();
+                randomSendingPeer = entry.getValue();
             }
             if (i == randomReceiver) {
                     receivingPeer = entry.getValue();
@@ -61,23 +90,34 @@ public class SendMessages implements Runnable {
         DatagramSocket udpPeerSend = new DatagramSocket();
 
         InetAddress addressReceiverUDP = InetAddress.getByName(receivingPeer.getAddress());
-        String str = "peer" + randomPeer.getAddress() + ":" + randomPeer.getPort();
+        String str = "peer" + randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort();
         byte[] buf = str.getBytes();
         DatagramPacket packetSend = new DatagramPacket(buf, buf.length, addressReceiverUDP, receivingPeer.getPort());
 
-        udpPeerSend.send(packetSend);
-        System.out.println("Sent peer at " + randomPeer.getAddress() + ":" +randomPeer.getPort() + " to " + addressReceiverUDP.toString() + ":"+ receivingPeer.getPort());
-        udpPeerSend.close();
+        try{
+            udpPeerSend.send(packetSend);
+            addPeerToSendLog(randomSendingPeer, receivingPeer, myDateObj);
+            /*
+            Peer peer = new Peer("someTeamName" + Integer.toString(counter), randomSendingPeer.getAddress(), randomSendingPeer.getPort(), myDateObj);
+            peersSent.put(peer.getTeamName(), peer);
+            */
+            udpPeerSend.close();
+        }
+        catch(Exception e){
+            System.out.println("Peer " + randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort() + " was not sent");
+        }
     }
 
     @Override
     public void run() {
         while (Client.isRunning) {
+            int counter = 0;
             try {
                 sendSnippet();
-                sendPeer();
+                sendPeer(counter);
                 Thread.sleep(3000);
                 timeStamp += 1;
+                counter++;
             } catch (Exception e) {
                 System.err.println("failed to send snip message ");
                 e.printStackTrace();

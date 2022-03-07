@@ -4,6 +4,7 @@
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.io.IOException;
@@ -20,7 +21,11 @@ public class PeerCom implements Runnable{
 
     private ConcurrentHashMap<String, Peer> peersMap;
     private ConcurrentHashMap<String, Peer> allPeers;
+    private ConcurrentHashMap<String, Peer> peersRecv;
+    private String thisPeerAddress;
+    private int thisPeerPort; 
 
+    private String peersRecvLog = ""; 
     private String newPeerAddress;
     private int newPeerPort;
 
@@ -28,10 +33,12 @@ public class PeerCom implements Runnable{
     private int arbitraryNum = 123;
 
 
-    public PeerCom(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer) {
+    public PeerCom(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer, String thisPeerAddress, int thisPeerPort) {
         this.peersMap = peersMap;
         this.allPeers = peersMap;
         this.udpServer = udpServer;
+        this.thisPeerAddress = thisPeerAddress;
+        this.thisPeerPort = thisPeerPort; 
     }
 
     public PeerCom(String address, int port) {
@@ -39,7 +46,17 @@ public class PeerCom implements Runnable{
         this.newPeerPort = port;
     }
 
+    public String getPeersRecvLog(){ return peersRecvLog; }
+
     public ConcurrentHashMap<String, Peer> getAllPeers(){ return allPeers; }
+    
+    public ConcurrentHashMap<String, Peer> getPeersRecv(){ return peersRecv; }
+
+    public String getThisPeerAddress(){ return thisPeerAddress; }
+
+    public int getThisPeerPort(){ return thisPeerPort; }
+
+    public 
 
 //    public void updatePeerList(String newPeerAddress, int newPeerPort){
 //        for(Peer p : allPeers){
@@ -67,7 +84,7 @@ public class PeerCom implements Runnable{
         Client.isRunning = false;
     }
 
-    private void handleSnipMessage(String[] messages, DatagramPacket packet) {
+    private void handleSnipMessage(String[] messages, DatagramPacket packet, LocalDateTime timeRecv) {
         String[] msg = messages[0].split("snip");
         int msgTimeStamp = Integer.parseInt(msg[1]);
         String snipContent = "";
@@ -80,13 +97,13 @@ public class PeerCom implements Runnable{
         String newSnippet = msgTimeStamp + snipContent + " " + msgSenderAddress;
         System.out.println("Snippet Received: " + newSnippet);
         snippets.add(newSnippet);
-        addPeer(address[1]);
+        addPeer(address[1], timeRecv);
     }
 
-    private void addPeer(String address) {
+    private void addPeer(String address, LocalDateTime timeRecv) {
         boolean isDuplicate = false;
         boolean isDuplicateAllPeers = false;
-        LocalDateTime myDateObj = LocalDateTime.now();
+        boolean isDuplicatePeersRecv = false;
 
         for (Entry<String, Peer> entry : peersMap.entrySet()) {
             Peer existingPeer = entry.getValue();
@@ -104,19 +121,31 @@ public class PeerCom implements Runnable{
             }
         }
 
-        if(isDuplicate == false){
-            
-            String arbitraryTeamName = "someTeamName" + arbitraryNum++;
-            String[] addressArr = address.split(":");
-
-            String socketAddr = addressArr[0];
-            int port = Integer.parseInt(addressArr[1]);
-            Peer newPeer = new Peer(arbitraryTeamName, socketAddr, port, myDateObj);
-            
-            if(isDuplicateAllPeers == false){
-                allPeers.put(arbitraryTeamName, newPeer);
+        for (Entry<String, Peer> entry : peersRecv.entrySet()) {
+            Peer existingPeer = entry.getValue();
+            if (address.equals(existingPeer.getAddress() + ":" + existingPeer.getPort())) {
+                isDuplicatePeersRecv = true;
+                break;
             }
         }
+
+        String arbitraryTeamName = "someTeamName" + arbitraryNum++;
+        String[] addressArr = address.split(":");
+        String socketAddr = addressArr[0];
+        int port = Integer.parseInt(addressArr[1]);
+        Peer newPeer = new Peer(arbitraryTeamName, socketAddr, port, timeRecv);
+        
+
+        if(isDuplicate == false){
+            peersMap.put(newPeer.getTeamName(), newPeer); 
+        }
+        if(isDuplicateAllPeers == false){
+            allPeers.put(arbitraryTeamName, newPeer);
+        }
+        if(isDuplicatePeersRecv == false){
+            peersRecv.put(arbitraryTeamName, newPeer);
+        }
+
     }
 
     private void refreshPeerList(){
@@ -139,12 +168,35 @@ public class PeerCom implements Runnable{
         }
     }
 
-    private void handlePeerMessage(String message, DatagramPacket packet) {
+    private void handlePeerMessage(String message, DatagramPacket packet, LocalDateTime timeRecv) {
         String receivedPeerAddr = message.split("peer")[1];
         String senderPeerAddr = packet.getSocketAddress().toString();
 
-        addPeer(receivedPeerAddr);
-        addPeer(senderPeerAddr);
+        addPeer(receivedPeerAddr, timeRecv);
+        addPeer(senderPeerAddr, timeRecv);
+        addPeersRecvLog(receivedPeerAddr, senderPeerAddr, timeRecv);
+    }
+
+    private void addPeersRecvLog(String receivedPeerAddr, String senderPeerAddr, LocalDateTime timeRecv){
+        //String[] receivedPeerAddrProperties = receivedPeerAddr.split(":");
+        //String[] senderPeerAddrProperties = senderPeerAddr.split(":");
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String formattedDateTime = timeRecv.format(formatter);
+
+        if(peersRecvLog == ""){
+            peersRecvLog = Integer.toString(peersRecv.size()) + "\n" +
+            senderPeerAddr + " " +
+            receivedPeerAddr + " " + 
+            formattedDateTime + "\n";
+        }
+        else{
+            peersRecvLog = peersRecvLog + 
+            Integer.toString(peersRecv.size()) + "\n" +
+            senderPeerAddr + " " +
+            receivedPeerAddr + " " + 
+            formattedDateTime + "\n";
+        }
     }
 
     @Override
@@ -155,14 +207,15 @@ public class PeerCom implements Runnable{
                 System.out.println(packet);
                 String message = new String(packet.getData(), 0, packet.getLength());
                 try {
+                    LocalDateTime timeRecv = LocalDateTime.now();
                     String[] messages = message.split(" ");
                     String request = messages[0].substring(0, 4);
                     if (request.equals("peer")) {
-                        handlePeerMessage(message, packet);
+                        handlePeerMessage(message, packet, timeRecv);
                         refreshPeerList();
                     }
                     else if (request.equals("snip")) {
-                        handleSnipMessage(messages, packet);
+                        handleSnipMessage(messages, packet, timeRecv);
                     }
                     else if (request.equals("stop")) {
                         handleStopMessage();

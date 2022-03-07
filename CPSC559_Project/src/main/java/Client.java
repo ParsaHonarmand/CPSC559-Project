@@ -124,13 +124,19 @@ public class Client {
     /**
      * Creates a report from the peersMap and the date that this map's data was
      * retrieved
+     * @param udpServer
      * 
      * @return the report as a string
      */
-    public String createReport(Socket sock) {
+    public String createReport(Socket sock, DatagramSocket udpServer) {
 
         // Used to record report date
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        PeerCom peerCom = new PeerCom(peersMap, udpServer, (sock.getInetAddress()).getHostAddress(), sock.getPort());
+        SendMessages sendMessages = new SendMessages(peersMap, udpServer);
+        ConcurrentHashMap<String, Peer> allPeers = peerCom.getAllPeers();
+        ConcurrentHashMap<String, Peer> peersSent = sendMessages.getPeersSent();
+
         String report = peersMap.size() + "\n"; // Initial state of report composition in string form
 
         // If peers are previously received
@@ -155,6 +161,11 @@ public class Client {
                 Peer peer = entry.getValue();
                 report += peer.getAddress() + ":" + peer.getPort() + "\n";
             }
+
+            report += peerCom.getPeersRecvLog() + sendMessages.getPeersSendingLog();
+
+            //report += snippet messages with timestamps
+
         } else { // If no peers are detected
             /*
              * report += "1\n" + serverAddress + ":" + serverPort + "\n" +
@@ -188,7 +199,7 @@ public class Client {
         String serverReqMsg = "";
 
         //PeerCom thread initialize
-        PeerCom peerCom = new PeerCom(peersMap, udpServer);
+        PeerCom peerCom = new PeerCom(peersMap, udpServer, address, port);
         SendMessages msgSender = new SendMessages(peersMap, udpServer);
         Thread peerComThread = new Thread(peerCom);
         Thread msgSenderThread = new Thread(msgSender);
@@ -214,7 +225,7 @@ public class Client {
                 peerComThread.start();
                 msgSenderThread.start();
             } else if (serverReqMsg.equals("get report")) {
-                String report = createReport(sock);
+                String report = createReport(sock, udpServer);
                 System.out.println("Report:\n" + report);
                 sock.getOutputStream().write(report.getBytes());
                 sock.getOutputStream().flush();
