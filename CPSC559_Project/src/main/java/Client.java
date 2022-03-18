@@ -3,6 +3,7 @@
 import java.io.*;
 import java.net.*;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -10,9 +11,13 @@ public class Client {
     Scanner keyboard = new Scanner(System.in);
     private ConcurrentHashMap<String, Peer> peersMap = new ConcurrentHashMap<>();
     Date date;
-    int numOfReceiveReqs;
+    int arbtiraryNum;
+    Socket sock;
+    InputStream input;
+    BufferedReader reader;
+    DatagramSocket udpServer;
     public static boolean isRunning = true;
-    // Peer[] peersSent = null;
+    private ArrayList<String> snippets;
 
     // Prompt for team name
     private String selectTeamName() {
@@ -108,11 +113,13 @@ public class Client {
 
             // if peer is not duplicate, add to map of peers
             if (!repeated) {
-                Peer peer = new Peer("placeHolder_teamName" + numOfReceiveReqs, // Team name for now until we are
+                LocalDateTime myDateObj = LocalDateTime.now();
+
+                Peer peer = new Peer("placeHolder_teamName" + arbtiraryNum, // Team name for now until we are
                                                                                 // assigned one
-                        peerProperties[0], Integer.parseInt(peerProperties[1]));
+                        peerProperties[0], Integer.parseInt(peerProperties[1]), myDateObj);
                 peersMap.put(peer.getTeamName(), peer); // Populate hashmap using team name as key
-                numOfReceiveReqs++;
+                arbtiraryNum++;
             }
         }
         System.out.println(peersMap);
@@ -121,18 +128,22 @@ public class Client {
     /**
      * Creates a report from the peersMap and the date that this map's data was
      * retrieved
+     * @param udpServer
      * 
      * @return the report as a string
      */
-    public String createReport(Socket sock) {
-
+    public String createReport(Socket sock, DatagramSocket udpServer) {
         // Used to record report date
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        PeerCom peerCom = new PeerCom(peersMap, udpServer);
+        SendMessages sendMessages = new SendMessages(peersMap, udpServer);
+        ConcurrentHashMap<String, Peer> allPeers = peerCom.getAllPeers();
+        ConcurrentHashMap<String, Peer> peersSent = sendMessages.getPeersSent();
+
         String report = peersMap.size() + "\n"; // Initial state of report composition in string form
 
         // If peers are previously received
         if (peersMap.size() > 0) {
-
             // Add all peer details
             for (Map.Entry<String, Peer> entry : peersMap.entrySet()) {
                 String teamName = entry.getKey();
@@ -152,6 +163,11 @@ public class Client {
                 Peer peer = entry.getValue();
                 report += peer.getAddress() + ":" + peer.getPort() + "\n";
             }
+
+            report += peerCom.getPeersRecvLog() + sendMessages.getPeersSendingLog();
+
+            //report += snippet messages with timestamps
+
         } else { // If no peers are detected
             /*
              * report += "1\n" + serverAddress + ":" + serverPort + "\n" +
@@ -161,7 +177,54 @@ public class Client {
             report += "0\n";
         }
 
+        report += snippets.size() + "\n";
+        for (int i = 0; i < snippets.size(); i++) {
+            report += snippets.get(i) + "\n";
+        }
+
         return report;
+    }
+
+    public void connectToRegistryAgain(String address, int port, String teamName) throws IOException {
+        sock = new Socket(address, port);
+        input = sock.getInputStream();
+        reader = new BufferedReader(new InputStreamReader(input));
+        String serverReqMsg = "";
+        while (!sock.isClosed() && sock.isConnected() && (serverReqMsg = reader.readLine()) != null) {
+            System.out.println("Received from server: " + serverReqMsg);
+            if (serverReqMsg.equals("get team name")) {
+                teamName += "\n";
+                sock.getOutputStream().write(teamName.getBytes());
+                sock.getOutputStream().flush();
+            } else if (serverReqMsg.equals("get code")) {
+                String filesText = ".java\n";
+                sock.getOutputStream().write(filesText.getBytes());
+                sock.getOutputStream().flush();
+
+                sendSourceCode(new File(".").listFiles(), sock);
+                String endCode = "...\n";
+                sock.getOutputStream().write(endCode.getBytes());
+                sock.getOutputStream().flush();
+            } else if (serverReqMsg.equals("receive peers")) {
+                getPeers(reader);
+            } else if (serverReqMsg.equals("get report")) {
+                String report = createReport(sock, udpServer);
+                System.out.println("Report:\n" + report);
+                sock.getOutputStream().write(report.getBytes());
+                sock.getOutputStream().flush();
+                System.out.println("Report sent to host.");
+            } else if (serverReqMsg.equals("close")) {
+                sock.close();
+            } else if (serverReqMsg.equals("get location")){
+                String clientAddress = sock.getLocalAddress().toString().substring(1);
+                int udpPort = udpServer.getLocalPort();
+                String location = clientAddress + ":" + udpPort + "\n";
+
+                sock.getOutputStream().write(location.getBytes());
+                sock.getOutputStream().flush();
+                System.out.println("Sent peer " + location + " location to registry");
+            }
+        }
     }
 
     /**
@@ -172,14 +235,10 @@ public class Client {
      * @throws IOException
      */
     public void start(String address, int port, String teamName) throws IOException {
-        Random r = new Random();
-        int random = r.nextInt(2000);
-        System.out.println(random);
-        DatagramSocket udpServer = new DatagramSocket(random ,InetAddress.getByName("localhost"));
-//        InetSocketAddress addressUDP = new InetSocketAddress(address, port);
-//        udpServer.bind(null);
+        udpServer = new DatagramSocket();
+        System.out.println("UDP socket setup at " + udpServer.getLocalPort());
 
-        Socket sock = new Socket(address, port);
+        sock = new Socket(address, port);
         InputStream input = sock.getInputStream();
         BufferedReader reader = new BufferedReader(new InputStreamReader(input));
         String serverReqMsg = "";
@@ -197,7 +256,7 @@ public class Client {
                 sock.getOutputStream().write(teamName.getBytes());
                 sock.getOutputStream().flush();
             } else if (serverReqMsg.equals("get code")) {
-                String filesText = "java\n";
+                String filesText = ".java\n";
                 sock.getOutputStream().write(filesText.getBytes());
                 sock.getOutputStream().flush();
 
@@ -210,8 +269,12 @@ public class Client {
                 //Start sending other peers that this peer exists
                 peerComThread.start();
                 msgSenderThread.start();
+                while (peerComThread.isAlive()) {
+                    snippets = peerCom.getSnippets();
+                }
+                connectToRegistryAgain(address, port, teamName);
             } else if (serverReqMsg.equals("get report")) {
-                String report = createReport(sock);
+                String report = createReport(sock, udpServer);
                 System.out.println("Report:\n" + report);
                 sock.getOutputStream().write(report.getBytes());
                 sock.getOutputStream().flush();
@@ -219,84 +282,14 @@ public class Client {
             } else if (serverReqMsg.equals("close")) {
                 sock.close();
             } else if (serverReqMsg.equals("get location")){
-                String location = udpServer.getLocalAddress().getHostAddress() + ":" + udpServer.getLocalPort() + "\n";
+                String clientAddress = sock.getLocalAddress().toString().substring(1);
+                int udpPort = udpServer.getLocalPort();
+                String location = clientAddress + ":" + udpPort + "\n";
+
                 sock.getOutputStream().write(location.getBytes());
                 sock.getOutputStream().flush();
-                System.out.println("Sent peer " + address + ":" + port + " location to registry");
+                System.out.println("Sent peer " + location + " location to registry");
             }
-
-            //Starting receiving UDP messages from other peers
-//            try{
-//                byte[] buf = new byte[256];
-//                DatagramPacket packetReceiveUDP = new DatagramPacket(buf, buf.length);
-//                udpServer.receive(packetReceiveUDP);
-//                String response = new String(packetReceiveUDP.getData());
-//
-//                //Initializing UDP message handling thread
-//                UDP_Handling udpInput = new UDP_Handling(response, sock);
-//                Thread udp_thread = new Thread(udpInput);
-//
-//                if(response != null && (response.substring(0,4) == "peer" || response.substring(0,4) == "snip" || response.substring(0,4) == "stop")){
-//                    //If stop message is received then make report (still need to modify) and then join threads and stop program
-//                    if(response.substring(0,4) == "stop"){
-//                        String report = createReport(sock);
-//                        System.out.println("Report:\n" + report);
-//                        sock.getOutputStream().write(report.getBytes());
-//                        sock.getOutputStream().flush();
-//                        System.out.println("Report sent to host.");
-//
-//                        try {
-//                            udp_thread.join();
-//                            peerComThread.join();
-//                        } catch (InterruptedException e) {
-//                            e.printStackTrace();
-//                        }
-//                        udpServer.close();
-//                        sock.close();
-//                    }
-//                    else{
-//
-//                        udp_thread.start();
-//                        try {
-//                            udp_thread.join();
-//                        } catch (InterruptedException e) {
-//                            e.printStackTrace();
-//                        }
-//                    }
-//                }
-//            }
-//            catch(IOException e){
-//                e.printStackTrace();
-//            }
-
-            
-            
-            /*
-            try{
-                byte[] buf = new byte[256];
-                DatagramPacket packetReceiveUDP = new DatagramPacket(buf, buf.length);
-                serverToPeerUDP.receive(packetReceiveUDP);
-                String response = new String(packetReceiveUDP.getData());
-                
-                if(response == "stop"){
-                    String report = createReport(sock);
-                    System.out.println("Report:\n" + report);
-                    sock.getOutputStream().write(report.getBytes());
-                    sock.getOutputStream().flush();
-                    System.out.println("Report sent to host.");
-        
-                    sock.close();
-                    serverToPeerUDP.close();
-                }
-            }
-            catch(IOException e){
-                System.out.println("Did not recieve UDP packet from server to peer "+port);
-            }
-            */
-
-            
-
-            
         }
         System.out.println("Goodbye...");
     }
@@ -308,8 +301,6 @@ public class Client {
      * @param args address and port
      */
     public static void main(String[] args) throws IOException {
-        
-
         if (args.length == 3) {
             try {
                 String address = args[0];
@@ -330,24 +321,3 @@ public class Client {
         }
     }
 }
-
-/*
-
-                DatagramSocket clientUDP = new DatagramSocket();
-                DatagramSocket serverUDP = new DatagramSocket(4160);
-
-                InetAddress addressUDP = InetAddress.getByName(address);
-                String str = "stop";
-                byte[] buf = str.getBytes();
-                DatagramPacket packetSend = new DatagramPacket(buf, buf.length, addressUDP, 4160);
-                clientUDP.send(packetSend);
-                clientUDP.close();
-                
-
-                byte[] buff = new byte[256];
-                DatagramPacket packetReceive = new DatagramPacket(buff, buff.length);
-                serverUDP.recieve(packetReceive);
-                String response = new String(packetRecieve.getData());
-                System.out.println(response);
-                serverUDP.close();
-*/
