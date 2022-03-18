@@ -13,6 +13,7 @@ public class Peer {
         this.address = address;
         this.port = port;
         this.lastNoticed = lastNoticed;
+
     }
 
     public String getTeamName() { return teamName; }
