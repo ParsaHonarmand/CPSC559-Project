@@ -14,9 +14,9 @@ import java.util.concurrent.TimeUnit;
 public class SendMessages implements Runnable {
     DatagramSocket udpSocket;
     String peersSendingLog = ""; 
-    ConcurrentHashMap<String, Peer> peers;
-    ConcurrentHashMap<String, Peer> peersSent;
-    ConcurrentHashMap<String, Peer> peersSending;
+    ConcurrentHashMap<String, Peer> peers = new ConcurrentHashMap<String, Peer>();
+    ConcurrentHashMap<String, Peer> peersSent = new ConcurrentHashMap<String, Peer>();
+    ConcurrentHashMap<String, Peer> peersSending = new ConcurrentHashMap<String, Peer>();
 
     int timeStamp;
 
@@ -39,10 +39,17 @@ public class SendMessages implements Runnable {
 
         byte[] packet = message.getBytes();
         for (Map.Entry<String, Peer> entry : peers.entrySet()) {
-            System.out.println(entry.getValue().getAddress());
-            System.out.println(entry.getValue().getPort());
-            DatagramPacket dp = new DatagramPacket(packet, packet.length, InetAddress.getByName(entry.getValue().getAddress()), entry.getValue().getPort());
-            udpSocket.send(dp);
+            System.out.println("Sending snippet to: " +
+                    entry.getValue().getAddress() +
+                    ":" +
+                    entry.getValue().getPort()
+            );
+            try {
+                DatagramPacket dp = new DatagramPacket(packet, packet.length, InetAddress.getByName(entry.getValue().getAddress()), entry.getValue().getPort());
+                udpSocket.send(dp);
+            } catch (Exception e) {
+                System.out.println("Peer is not active");
+            }
         }
     }
 
@@ -64,15 +71,14 @@ public class SendMessages implements Runnable {
         }
     }
 
-    private void sendPeer(int counter) throws java.io.IOException, InterruptedException{ 
-        TimeUnit.SECONDS.sleep(7);
-
+    private void sendPeer() throws java.io.IOException, InterruptedException{
+//        TimeUnit.SECONDS.sleep(7);
         Random r = new Random();
         int numOfPeers = peers.size();
         int random = r.nextInt(numOfPeers);
         int randomReceiver = r.nextInt(numOfPeers);
         LocalDateTime myDateObj = LocalDateTime.now();
-        
+
         Peer receivingPeer = new Peer("", "", 0, myDateObj);
         Peer randomSendingPeer = new Peer("", "", 0, myDateObj);
 
@@ -84,13 +90,14 @@ public class SendMessages implements Runnable {
             if (i == randomReceiver) {
                     receivingPeer = entry.getValue();
                 }
-                i++;
+            i++;
         }
 
         DatagramSocket udpPeerSend = new DatagramSocket();
 
         InetAddress addressReceiverUDP = InetAddress.getByName(receivingPeer.getAddress());
         String str = "peer" + randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort();
+        System.out.println("Sending " + str + " to " + receivingPeer.getPort());
         byte[] buf = str.getBytes();
         DatagramPacket packetSend = new DatagramPacket(buf, buf.length, addressReceiverUDP, receivingPeer.getPort());
 
@@ -105,23 +112,33 @@ public class SendMessages implements Runnable {
         }
         catch(Exception e){
             System.out.println("Peer " + randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort() + " was not sent");
+            e.printStackTrace();
         }
     }
 
     @Override
     public void run() {
+        Runnable sendPeer = () -> {
+            try {
+                sendPeer();
+                Thread.sleep(5000);
+            } catch (InterruptedException | IOException e) {
+                e.printStackTrace();
+            }
+        };
+
+        Thread peerThread = new Thread(sendPeer);
+        peerThread.start();
+        timeStamp += 1;
+
         while (Client.isRunning) {
-            int counter = 0;
             try {
                 sendSnippet();
-                sendPeer(counter);
-                Thread.sleep(3000);
-                timeStamp += 1;
-                counter++;
             } catch (Exception e) {
-                System.err.println("failed to send snip message ");
+                System.err.println("Failed to send snippet");
                 e.printStackTrace();
             }
         }
+        peerThread.interrupt();
     }
 }
