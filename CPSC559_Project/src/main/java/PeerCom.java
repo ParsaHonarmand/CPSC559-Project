@@ -107,13 +107,13 @@ public class PeerCom implements Runnable{
         int port = Integer.parseInt(addressArr[1]);
         Peer newPeer = new Peer(arbitraryTeamName, socketAddr, port, timeRecv);
 
-        if(isDuplicate == false){
+        if(!isDuplicate){
             peersMap.put(newPeer.getTeamName(), newPeer);
         }
-        if(isDuplicateAllPeers == false){
+        if(!isDuplicateAllPeers){
             allPeers.put(arbitraryTeamName, newPeer);
         }
-        if(isDuplicatePeersRecv == false){
+        if(!isDuplicatePeersRecv){
             peersRecv.put(arbitraryTeamName, newPeer);
         }
 
@@ -182,15 +182,17 @@ public class PeerCom implements Runnable{
                     String[] messages = message.split(" ");
                     String request = messages[0].substring(0, 4);
                     System.out.println("Request RECEIVED: " + request);
-                    if (request.equals("peer")) {
-                        handlePeerMessage(message, packet, timeRecv);
-                        refreshPeerList();
-                    }
-                    else if (request.equals("snip")) {
-                        handleSnipMessage(messages, packet, timeRecv);
-                    }
-                    else if (request.equals("stop")) {
-                        handleStopMessage();
+                    switch (request) {
+                        case "peer":
+                            handlePeerMessage(message, packet, timeRecv);
+                            refreshPeerList();
+                            break;
+                        case "snip":
+                            handleSnipMessage(messages, packet, timeRecv);
+                            break;
+                        case "stop":
+                            handleStopMessage();
+                            break;
                     }
                 } catch (Exception e) {
                     System.out.println("Could not process udp message");

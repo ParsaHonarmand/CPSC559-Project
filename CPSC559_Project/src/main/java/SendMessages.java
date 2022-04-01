@@ -11,6 +11,8 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import static java.lang.Thread.interrupted;
+
 public class SendMessages implements Runnable {
     DatagramSocket udpSocket;
     String peersSendingLog = ""; 
@@ -83,6 +85,7 @@ public class SendMessages implements Runnable {
         Peer randomSendingPeer = new Peer("", "", 0, myDateObj);
 
         int i = 0;
+        System.out.println("Size: " + peers.size());
         for (Entry<String, Peer> entry : peers.entrySet()) {
             if (i == random) {
                 randomSendingPeer = entry.getValue();
@@ -116,48 +119,17 @@ public class SendMessages implements Runnable {
         }
     }
 
-    private void sendPeer() throws java.io.IOException, InterruptedException{ 
-        TimeUnit.SECONDS.sleep(7);
-
-        Random r = new Random();
-        int numOfPeers = peers.size();
-        int random = r.nextInt(numOfPeers);
-        int randomReceiver = r.nextInt(numOfPeers);
-        
-        Peer receivingPeer = new Peer("", "", 0);
-        Peer randomPeer = new Peer("", "", 0);
-
-        int i = 0;
-        for (Entry<String, Peer> entry : peers.entrySet()) {
-            if (i == random) {
-                randomPeer = entry.getValue();
-            }
-            if (i == randomReceiver) {
-                    receivingPeer = entry.getValue();
-                }
-                i++;
-        }
-
-        DatagramSocket udpPeerSend = new DatagramSocket();
-
-        InetAddress addressReceiverUDP = InetAddress.getByName(receivingPeer.getAddress());
-        String str = "peer" + randomPeer.getAddress() + ":" + randomPeer.getPort();
-        byte[] buf = str.getBytes();
-        DatagramPacket packetSend = new DatagramPacket(buf, buf.length, addressReceiverUDP, receivingPeer.getPort());
-
-        udpPeerSend.send(packetSend);
-        System.out.println("Sent peer at " + randomPeer.getAddress() + ":" +randomPeer.getPort() + " to " + addressReceiverUDP.toString() + ":"+ receivingPeer.getPort());
-        udpPeerSend.close();
-    }
-
     @Override
     public void run() {
         Runnable sendPeer = () -> {
-            try {
-                sendPeer();
-                Thread.sleep(5000);
-            } catch (InterruptedException | IOException e) {
-                e.printStackTrace();
+            while (!interrupted()) {
+                try {
+                    System.out.println("Calling sendPeer()");
+                    sendPeer();
+                    Thread.sleep(5000);
+                } catch (InterruptedException | IOException e) {
+                    e.printStackTrace();
+                }
             }
         };
 
@@ -168,9 +140,6 @@ public class SendMessages implements Runnable {
         while (Client.isRunning) {
             try {
                 sendSnippet();
-                sendPeer();
-                Thread.sleep(3000);
-                timeStamp += 1;
             } catch (Exception e) {
                 System.err.println("Failed to send snippet");
                 e.printStackTrace();
