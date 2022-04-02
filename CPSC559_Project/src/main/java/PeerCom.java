@@ -16,6 +16,7 @@ import java.util.Random;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class PeerCom implements Runnable{
     private DatagramSocket udpServer;
@@ -27,13 +28,14 @@ public class PeerCom implements Runnable{
     private String peersRecvLog = "";
 
     private ArrayList<String> snippets = new ArrayList<String>();
-    private int arbitraryNum = 123;
 
+    public AtomicInteger timeStamp;
 
-    public PeerCom(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer) {
+    public PeerCom(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer, AtomicInteger timeStamp) {
         this.peersMap = peersMap;
         this.allPeers = peersMap;
         this.udpServer = udpServer;
+        this.timeStamp = timeStamp;
     }
 
     public String getPeersRecvLog(){ return peersRecvLog; }
@@ -78,6 +80,7 @@ public class PeerCom implements Runnable{
     private void handleSnipMessage(String[] messages, DatagramPacket packet, LocalDateTime timeRecv) {
         String[] msg = messages[0].split("snip");
         int msgTimeStamp = Integer.parseInt(msg[1]);
+        timeStamp.set(Math.max(msgTimeStamp, timeStamp.get()));
         String snipContent = "";
         for (int i = 1; i < messages.length; i++) {
             snipContent += " " + messages[i];
@@ -86,7 +89,7 @@ public class PeerCom implements Runnable{
         String msgSenderAddress = packet.getSocketAddress().toString();
 
         String[] address = msgSenderAddress.split("/");
-        String newSnippet = msgTimeStamp + snipContent + " " + msgSenderAddress.substring(1);
+        String newSnippet = timeStamp.get() + snipContent + " " + msgSenderAddress.substring(1);
         System.out.println("Snippet Received: " + newSnippet);
         snippets.add(newSnippet);
         addPeer(address[1], timeRecv);
@@ -173,9 +176,6 @@ public class PeerCom implements Runnable{
     }
 
     private void addPeersRecvLog(String receivedPeerAddr, String senderPeerAddr, LocalDateTime timeRecv){
-        //String[] receivedPeerAddrProperties = receivedPeerAddr.split(":");
-        //String[] senderPeerAddrProperties = senderPeerAddr.split(":");
-
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String formattedDateTime = timeRecv.format(formatter);
 
@@ -195,7 +195,7 @@ public class PeerCom implements Runnable{
                     LocalDateTime timeRecv = LocalDateTime.now();
                     String[] messages = message.split(" ");
                     String request = messages[0].substring(0, 4);
-                    System.out.println("Request RECEIVED: " + request);
+                    System.out.println("UDP Request RECEIVED: " + request);
                     switch (request) {
                         case "peer":
                             handlePeerMessage(message, packet, timeRecv);
@@ -209,11 +209,12 @@ public class PeerCom implements Runnable{
                             break;
                     }
                 } catch (Exception e) {
+                    timeStamp.getAndSet(0);
                     System.out.println("Could not process udp message");
                     e.printStackTrace();
                 }
-//                Thread.sleep(1000);
             } catch (Exception e) {
+                timeStamp.getAndSet(0);
                 System.out.println("Could not receive udp request");
                 e.printStackTrace();
             }

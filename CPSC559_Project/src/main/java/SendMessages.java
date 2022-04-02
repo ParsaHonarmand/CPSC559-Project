@@ -11,6 +11,7 @@ import java.util.Scanner;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Thread.interrupted;
 
@@ -21,12 +22,12 @@ public class SendMessages implements Runnable {
     ConcurrentHashMap<String, Peer> peersSent = new ConcurrentHashMap<String, Peer>();
     ConcurrentHashMap<String, Peer> peersSending = new ConcurrentHashMap<String, Peer>();
 
-    int timeStamp;
+    public AtomicInteger timeStamp;
 
-    public SendMessages(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer) {
+    public SendMessages(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer, AtomicInteger timeStamp) {
         this.peers = peersMap;
-        this.timeStamp = 0;
         this.udpSocket = udpServer;
+        this.timeStamp = timeStamp;
     }
 
     public ConcurrentHashMap<String, Peer> getPeersSent(){ return peersSent; }
@@ -39,7 +40,7 @@ public class SendMessages implements Runnable {
     private void sendSnippet() throws java.io.IOException {
         Scanner keyboard = new Scanner(System.in);
         String userSnip = keyboard.nextLine();
-        String message = "snip" + timeStamp + " " + userSnip;
+        String message = "snip" + timeStamp.get() + " " + userSnip;
 
         byte[] packet = message.getBytes();
         for (Map.Entry<String, Peer> entry : peers.entrySet()) {
@@ -51,6 +52,7 @@ public class SendMessages implements Runnable {
             try {
                 DatagramPacket dp = new DatagramPacket(packet, packet.length, InetAddress.getByName(entry.getValue().getAddress()), entry.getValue().getPort());
                 udpSocket.send(dp);
+                timeStamp.getAndIncrement();
             } catch (Exception e) {
                 System.out.println("Peer is not active");
             }
@@ -134,7 +136,6 @@ public class SendMessages implements Runnable {
 
         Thread peerThread = new Thread(sendPeer);
         peerThread.start();
-        timeStamp += 1;
 
         while (Client.isRunning) {
             try {
