@@ -5,6 +5,7 @@ import java.net.InetAddress;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.Map.Entry;
@@ -31,6 +32,7 @@ public class SendMessages implements Runnable {
     public ConcurrentHashMap<String, Peer> getPeersSent(){ return peersSent; }
 
     public ConcurrentHashMap<String, Peer> getPeersSending(){ return peersSending; }
+    public int getPeersSentSize() { return peersSent.size(); }
 
     public String getPeersSendingLog(){ return peersSendingLog; }
 
@@ -58,19 +60,11 @@ public class SendMessages implements Runnable {
     private void addPeerToSendLog(Peer randomSendingPeer, Peer receivingPeer, LocalDateTime timeSent){
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String formattedDateTime = timeSent.format(formatter);
-        if(peersSendingLog == ""){
-            peersSendingLog = Integer.toString(peersSent.size()) + "\n" + 
-            randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort() + " " + 
-            receivingPeer.getAddress() + ":" + receivingPeer.getPort() + 
-            formattedDateTime + "\n";
-        }
-        else{
-            peersSendingLog = peersSendingLog +
-            Integer.toString(peersSent.size()) + "\n" + 
-            randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort() + " " + 
-            receivingPeer.getAddress() + ":" + receivingPeer.getPort() + 
-            formattedDateTime + "\n";
-        }
+
+        peersSendingLog +=
+                randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort() + " " +
+                receivingPeer.getAddress() + ":" + receivingPeer.getPort() + " " +
+                formattedDateTime + "\n";
     }
 
     private void sendPeer() throws java.io.IOException, InterruptedException{
@@ -96,7 +90,7 @@ public class SendMessages implements Runnable {
             i++;
         }
 
-        DatagramSocket udpPeerSend = new DatagramSocket();
+//        DatagramSocket udpPeerSend = new DatagramSocket();
 
         InetAddress addressReceiverUDP = InetAddress.getByName(receivingPeer.getAddress());
         String str = "peer" + randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort();
@@ -105,13 +99,18 @@ public class SendMessages implements Runnable {
         DatagramPacket packetSend = new DatagramPacket(buf, buf.length, addressReceiverUDP, receivingPeer.getPort());
 
         try{
-            udpPeerSend.send(packetSend);
+            udpSocket.send(packetSend);
             addPeerToSendLog(randomSendingPeer, receivingPeer, myDateObj);
-            /*
-            Peer peer = new Peer("someTeamName" + Integer.toString(counter), randomSendingPeer.getAddress(), randomSendingPeer.getPort(), myDateObj);
+
+            Peer peer = new Peer(
+                    randomSendingPeer.getAddress()+":"+randomSendingPeer.getPort(),
+                    randomSendingPeer.getAddress(),
+                    randomSendingPeer.getPort(),
+                    myDateObj);
+
             peersSent.put(peer.getTeamName(), peer);
-            */
-            udpPeerSend.close();
+
+//            udpSocket.close();
         }
         catch(Exception e){
             System.out.println("Peer " + randomSendingPeer.getAddress() + ":" + randomSendingPeer.getPort() + " was not sent");
@@ -126,7 +125,7 @@ public class SendMessages implements Runnable {
                 try {
                     System.out.println("Calling sendPeer()");
                     sendPeer();
-                    Thread.sleep(5000);
+                    Thread.sleep(10000);
                 } catch (InterruptedException | IOException e) {
                     e.printStackTrace();
                 }
@@ -145,6 +144,7 @@ public class SendMessages implements Runnable {
                 e.printStackTrace();
             }
         }
+        System.out.println("HELLO");
         peerThread.interrupt();
     }
 }

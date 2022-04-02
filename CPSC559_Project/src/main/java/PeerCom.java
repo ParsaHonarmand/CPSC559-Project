@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,8 +37,10 @@ public class PeerCom implements Runnable{
     }
 
     public String getPeersRecvLog(){ return peersRecvLog; }
+    public int getPeersRecvSize(){ return peersRecv.size(); }
 
     public ConcurrentHashMap<String, Peer> getAllPeers(){ return allPeers; }
+    public ConcurrentHashMap<String, Peer> getReceivedPeers(){ return peersRecv; }
 
     public ArrayList<String> getSnippets() {
         return snippets;
@@ -50,8 +53,25 @@ public class PeerCom implements Runnable{
         return packet;
     }
 
-    private void handleStopMessage() {
+    private void sendAck(String address, int port) {
+        String message = "ack" + "teamP";
+        byte[] packet = message.getBytes();
+        try {
+            DatagramPacket ackPacket = new DatagramPacket(packet, packet.length,
+                    InetAddress.getByName(address), port);
+            udpServer.send(ackPacket);
+            System.out.println("Sent ack to registry: " + address + ":" + port);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void handleStopMessage(String message, DatagramPacket packet) {
         System.out.println("Stop request received");
+        System.out.println(packet.getAddress().getHostAddress());
+        String address = packet.getAddress().getHostAddress();
+        int port = packet.getPort();
+        sendAck(address, port);
         Client.isRunning = false;
     }
 
@@ -101,20 +121,23 @@ public class PeerCom implements Runnable{
             }
         }
 
-        String arbitraryTeamName = "someTeamName" + arbitraryNum++;
         String[] addressArr = address.split(":");
-        String socketAddr = addressArr[0];
+        String socketAddr = addressArr[0].substring(1);
         int port = Integer.parseInt(addressArr[1]);
-        Peer newPeer = new Peer(arbitraryTeamName, socketAddr, port, timeRecv);
+        Peer newPeer = new Peer(
+                socketAddr + ":" + port,
+                socketAddr,
+                port,
+                timeRecv);
 
         if(!isDuplicate){
             peersMap.put(newPeer.getTeamName(), newPeer);
         }
         if(!isDuplicateAllPeers){
-            allPeers.put(arbitraryTeamName, newPeer);
+            allPeers.put(newPeer.getTeamName(), newPeer);
         }
         if(!isDuplicatePeersRecv){
-            peersRecv.put(arbitraryTeamName, newPeer);
+            peersRecv.put(newPeer.getTeamName(), newPeer);
         }
 
     }
@@ -142,6 +165,7 @@ public class PeerCom implements Runnable{
     private void handlePeerMessage(String message, DatagramPacket packet, LocalDateTime timeRecv) {
         String receivedPeerAddr = message.split("peer")[1];
         String senderPeerAddr = packet.getSocketAddress().toString();
+        senderPeerAddr = senderPeerAddr.substring(1);
         System.out.println("New Peer Message: " + senderPeerAddr);
         addPeer(receivedPeerAddr, timeRecv);
         addPeer(senderPeerAddr, timeRecv);
@@ -155,19 +179,10 @@ public class PeerCom implements Runnable{
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String formattedDateTime = timeRecv.format(formatter);
 
-        if(peersRecvLog == ""){
-            peersRecvLog = Integer.toString(peersRecv.size()) + "\n" +
-            senderPeerAddr + " " +
-            receivedPeerAddr + " " + 
-            formattedDateTime + "\n";
-        }
-        else{
-            peersRecvLog = peersRecvLog + 
-            Integer.toString(peersRecv.size()) + "\n" +
-            senderPeerAddr + " " +
-            receivedPeerAddr + " " + 
-            formattedDateTime + "\n";
-        }
+        peersRecvLog +=
+                senderPeerAddr + " " +
+                receivedPeerAddr + " " +
+                formattedDateTime + "\n";
     }
 
     @Override
@@ -175,7 +190,6 @@ public class PeerCom implements Runnable{
         while (Client.isRunning) {
             try {
                 DatagramPacket packet = getMessage();
-                System.out.println(packet.getData());
                 String message = new String(packet.getData(), 0, packet.getLength());
                 try {
                     LocalDateTime timeRecv = LocalDateTime.now();
@@ -191,18 +205,19 @@ public class PeerCom implements Runnable{
                             handleSnipMessage(messages, packet, timeRecv);
                             break;
                         case "stop":
-                            handleStopMessage();
+                            handleStopMessage(message, packet);
                             break;
                     }
                 } catch (Exception e) {
                     System.out.println("Could not process udp message");
                     e.printStackTrace();
                 }
-                Thread.sleep(1000);
+//                Thread.sleep(1000);
             } catch (Exception e) {
                 System.out.println("Could not receive udp request");
                 e.printStackTrace();
             }
         }
+        System.out.println("Stopped Running");
     }
 }

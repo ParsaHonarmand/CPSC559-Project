@@ -16,7 +16,9 @@ public class Client {
     InputStream input;
     BufferedReader reader;
     DatagramSocket udpServer;
-    public static boolean isRunning = true;
+    private PeerCom peerCom;
+    private SendMessages msgSender;
+    public static volatile boolean isRunning = true;
     private ArrayList<String> snippets;
 
     // Prompt for team name
@@ -115,8 +117,7 @@ public class Client {
             if (!repeated) {
                 LocalDateTime myDateObj = LocalDateTime.now();
 
-                Peer peer = new Peer("placeHolder_teamName" + arbtiraryNum, // Team name for now until we are
-                                                                                // assigned one
+                Peer peer = new Peer(peerProperties[0]+":"+Integer.parseInt(peerProperties[1]),
                         peerProperties[0], Integer.parseInt(peerProperties[1]), myDateObj);
                 peersMap.put(peer.getTeamName(), peer); // Populate hashmap using team name as key
                 arbtiraryNum++;
@@ -135,10 +136,10 @@ public class Client {
     public String createReport(Socket sock, DatagramSocket udpServer) {
         // Used to record report date
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        PeerCom peerCom = new PeerCom(peersMap, udpServer);
-        SendMessages sendMessages = new SendMessages(peersMap, udpServer);
-        ConcurrentHashMap<String, Peer> allPeers = peerCom.getAllPeers();
-        ConcurrentHashMap<String, Peer> peersSent = sendMessages.getPeersSent();
+//        PeerCom peerCom = new PeerCom(peersMap, udpServer);
+//        SendMessages sendMessages = new SendMessages(peersMap, udpServer);
+//        ConcurrentHashMap<String, Peer> allPeers = peerCom.getAllPeers();
+//        ConcurrentHashMap<String, Peer> peersSent = sendMessages.getPeersSent();
 
         String report = peersMap.size() + "\n"; // Initial state of report composition in string form
 
@@ -164,7 +165,19 @@ public class Client {
                 report += peer.getAddress() + ":" + peer.getPort() + "\n";
             }
 
-            report += peerCom.getPeersRecvLog() + sendMessages.getPeersSendingLog();
+            System.out.println(peerCom.getReceivedPeers());
+            peerCom.getReceivedPeers().forEach((key, value) -> System.out.println(key + " " + value.getPort()));
+            System.out.println("HELLO");
+
+            String peersReceivedLog = "";
+            peersReceivedLog += peerCom.getPeersRecvSize() + "\n";
+            peersReceivedLog += peerCom.getPeersRecvLog();
+            report += peersReceivedLog;
+
+            String peersSentLog = "";
+            peersSentLog += msgSender.getPeersSentSize() + "\n";
+            peersSentLog += msgSender.getPeersSendingLog();
+            report += peersSentLog;
 
             //report += snippet messages with timestamps
 
@@ -218,11 +231,12 @@ public class Client {
             } else if (serverReqMsg.equals("get location")){
                 String clientAddress = sock.getLocalAddress().toString().substring(1);
                 int udpPort = udpServer.getLocalPort();
-                String location = clientAddress + ":" + udpPort + "\n";
 
+                String location = clientAddress + ":" + udpPort;
+                System.out.println("Sending peer " + location + " location to registry");
+                location += "\n";
                 sock.getOutputStream().write(location.getBytes());
                 sock.getOutputStream().flush();
-                System.out.println("Sent peer " + location + " location to registry");
             }
         }
     }
@@ -244,8 +258,8 @@ public class Client {
         String serverReqMsg = "";
 
         //PeerCom thread initialize
-        PeerCom peerCom = new PeerCom(peersMap, udpServer);
-        SendMessages msgSender = new SendMessages(peersMap, udpServer);
+        peerCom = new PeerCom(peersMap, udpServer);
+        msgSender = new SendMessages(peersMap, udpServer);
         Thread peerComThread = new Thread(peerCom);
         Thread msgSenderThread = new Thread(msgSender);
 
@@ -284,11 +298,11 @@ public class Client {
             } else if (serverReqMsg.equals("get location")){
                 String clientAddress = sock.getLocalAddress().toString().substring(1);
                 int udpPort = udpServer.getLocalPort();
-                String location = clientAddress + ":" + udpPort + "\n";
-
+                String location = clientAddress + ":" + udpPort;
+                System.out.println("Sending peer " + location + " location to registry");
+                location += "\n";
                 sock.getOutputStream().write(location.getBytes());
                 sock.getOutputStream().flush();
-                System.out.println("Sent peer " + location + " location to registry");
             }
         }
         System.out.println("Goodbye...");
