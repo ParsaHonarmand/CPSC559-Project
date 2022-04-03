@@ -1,6 +1,3 @@
-//Need to still see if a peer has timed out therefore remove from currPeers but keep in allPeers for report
-//This program should send and receive peers from/to other peers and add to list of known peers (allPeers and currPeers)
-
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -9,10 +6,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.Random;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -22,27 +16,26 @@ public class PeerCom implements Runnable{
     private DatagramSocket udpServer;
 
     private ConcurrentHashMap<String, Peer> peersMap;
-    private ConcurrentHashMap<String, Peer> allPeers;
-    private ConcurrentHashMap<String, Peer> peersRecv = new ConcurrentHashMap<String, Peer>();
-
+//    private ConcurrentHashMap<String, Peer> peersRecv = new ConcurrentHashMap<String, Peer>();
+    private List<String> peersRecv;
     private String peersRecvLog = "";
 
     private ArrayList<String> snippets = new ArrayList<String>();
 
     public AtomicInteger timeStamp;
+    public volatile boolean isRunning = true;
 
     public PeerCom(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer, AtomicInteger timeStamp) {
         this.peersMap = peersMap;
-        this.allPeers = peersMap;
         this.udpServer = udpServer;
         this.timeStamp = timeStamp;
+        this.peersRecv = Collections.synchronizedList(new ArrayList<String>());
     }
 
     public String getPeersRecvLog(){ return peersRecvLog; }
     public int getPeersRecvSize(){ return peersRecv.size(); }
 
-    public ConcurrentHashMap<String, Peer> getAllPeers(){ return allPeers; }
-    public ConcurrentHashMap<String, Peer> getReceivedPeers(){ return peersRecv; }
+    public List<String> getReceivedPeers(){ return peersRecv; }
 
     public ArrayList<String> getSnippets() {
         return snippets;
@@ -68,16 +61,16 @@ public class PeerCom implements Runnable{
         }
     }
 
-    private void handleStopMessage(String message, DatagramPacket packet) {
+    private void handleStopMessage(String message, DatagramPacket packet) throws InterruptedException {
         System.out.println("Stop request received");
-        System.out.println(packet.getAddress().getHostAddress());
         String address = packet.getAddress().getHostAddress();
         int port = packet.getPort();
         sendAck(address, port);
-        Client.isRunning = false;
+        isRunning = false;
     }
 
     private void handleSnipMessage(String[] messages, DatagramPacket packet, LocalDateTime timeRecv) {
+        System.out.println("Snippet Received: " + Arrays.toString(messages));
         String[] msg = messages[0].split("snip");
         int msgTimeStamp = Integer.parseInt(msg[1]);
         timeStamp.set(Math.max(msgTimeStamp, timeStamp.get()));
@@ -88,44 +81,16 @@ public class PeerCom implements Runnable{
 
         String msgSenderAddress = packet.getSocketAddress().toString();
 
-        String[] address = msgSenderAddress.split("/");
-        String newSnippet = timeStamp.get() + snipContent + " " + msgSenderAddress.substring(1);
-        System.out.println("Snippet Received: " + newSnippet);
+        String address = msgSenderAddress.substring(1);
+        String newSnippet = timeStamp.get() + snipContent + " " + address;
+        System.out.println("Snippet Stored After Adjusting TimeStamp: " + newSnippet);
         snippets.add(newSnippet);
-        addPeer(address[1], timeRecv);
+        addPeer(address, timeRecv);
     }
 
     private void addPeer(String address, LocalDateTime timeRecv) {
-        boolean isDuplicate = false;
-        boolean isDuplicateAllPeers = false;
-        boolean isDuplicatePeersRecv = false;
-
-        for (Entry<String, Peer> entry : peersMap.entrySet()) {
-            Peer existingPeer = entry.getValue();
-            if (address.equals(existingPeer.getAddress() + ":" + existingPeer.getPort())) {
-                isDuplicate = true;
-                break;
-            }
-        }
-
-        for (Entry<String, Peer> entry : allPeers.entrySet()) {
-            Peer existingPeer = entry.getValue();
-            if (address.equals(existingPeer.getAddress() + ":" + existingPeer.getPort())) {
-                isDuplicateAllPeers = true;
-                break;
-            }
-        }
-
-        for (Entry<String, Peer> entry : peersRecv.entrySet()) {
-            Peer existingPeer = entry.getValue();
-            if (address.equals(existingPeer.getAddress() + ":" + existingPeer.getPort())) {
-                isDuplicatePeersRecv = true;
-                break;
-            }
-        }
-
         String[] addressArr = address.split(":");
-        String socketAddr = addressArr[0].substring(1);
+        String socketAddr = addressArr[0];
         int port = Integer.parseInt(addressArr[1]);
         Peer newPeer = new Peer(
                 socketAddr + ":" + port,
@@ -133,16 +98,7 @@ public class PeerCom implements Runnable{
                 port,
                 timeRecv);
 
-        if(!isDuplicate){
-            peersMap.put(newPeer.getTeamName(), newPeer);
-        }
-        if(!isDuplicateAllPeers){
-            allPeers.put(newPeer.getTeamName(), newPeer);
-        }
-        if(!isDuplicatePeersRecv){
-            peersRecv.put(newPeer.getTeamName(), newPeer);
-        }
-
+        peersMap.putIfAbsent(socketAddr + ":" + port, newPeer);
     }
 
     private void refreshPeerList(){
@@ -155,13 +111,9 @@ public class PeerCom implements Runnable{
             int nowToLastNoticed = currentTime.compareTo(lastNoticed);
             int nowToExpiry = currentTime.compareTo(expiryTime);
 
-            
             if((nowToLastNoticed > 0 && nowToExpiry > 0) || (nowToLastNoticed < 0 && nowToExpiry > 0)){
                 peersMap.remove(entry.getKey());
-            }else if(nowToLastNoticed >= 0 && nowToExpiry <= 0){
-                //Keep Peer
             }
-            
         }
     }
 
@@ -170,6 +122,13 @@ public class PeerCom implements Runnable{
         String senderPeerAddr = packet.getSocketAddress().toString();
         senderPeerAddr = senderPeerAddr.substring(1);
         System.out.println("New Peer Message: " + senderPeerAddr);
+
+        peersRecv.add(
+                senderPeerAddr +
+                " " + receivedPeerAddr + " "
+                + timeRecv
+        );
+
         addPeer(receivedPeerAddr, timeRecv);
         addPeer(senderPeerAddr, timeRecv);
         addPeersRecvLog(receivedPeerAddr, senderPeerAddr, timeRecv);
@@ -187,7 +146,7 @@ public class PeerCom implements Runnable{
 
     @Override
     public void run() {
-        while (Client.isRunning) {
+        while (isRunning) {
             try {
                 DatagramPacket packet = getMessage();
                 String message = new String(packet.getData(), 0, packet.getLength());
@@ -209,16 +168,16 @@ public class PeerCom implements Runnable{
                             break;
                     }
                 } catch (Exception e) {
-                    timeStamp.getAndSet(0);
+                    timeStamp.set(0);
                     System.out.println("Could not process udp message");
                     e.printStackTrace();
                 }
             } catch (Exception e) {
-                timeStamp.getAndSet(0);
+                timeStamp.set(0);
                 System.out.println("Could not receive udp request");
                 e.printStackTrace();
             }
         }
-        System.out.println("Stopped Running");
+        System.out.println("Receive Thread stopped running");
     }
 }

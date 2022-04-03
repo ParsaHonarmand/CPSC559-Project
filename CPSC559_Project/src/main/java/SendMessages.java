@@ -23,6 +23,7 @@ public class SendMessages implements Runnable {
     ConcurrentHashMap<String, Peer> peersSending = new ConcurrentHashMap<String, Peer>();
 
     public AtomicInteger timeStamp;
+    public volatile boolean isRunning = true;
 
     public SendMessages(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer, AtomicInteger timeStamp) {
         this.peers = peersMap;
@@ -40,6 +41,7 @@ public class SendMessages implements Runnable {
     private void sendSnippet() throws java.io.IOException {
         Scanner keyboard = new Scanner(System.in);
         String userSnip = keyboard.nextLine();
+        timeStamp.getAndIncrement();
         String message = "snip" + timeStamp.get() + " " + userSnip;
 
         byte[] packet = message.getBytes();
@@ -52,7 +54,6 @@ public class SendMessages implements Runnable {
             try {
                 DatagramPacket dp = new DatagramPacket(packet, packet.length, InetAddress.getByName(entry.getValue().getAddress()), entry.getValue().getPort());
                 udpSocket.send(dp);
-                timeStamp.getAndIncrement();
             } catch (Exception e) {
                 System.out.println("Peer is not active");
             }
@@ -125,9 +126,8 @@ public class SendMessages implements Runnable {
         Runnable sendPeer = () -> {
             while (!interrupted()) {
                 try {
-                    System.out.println("Calling sendPeer()");
                     sendPeer();
-                    Thread.sleep(10000);
+                    Thread.sleep(80000);
                 } catch (InterruptedException | IOException e) {
                     e.printStackTrace();
                 }
@@ -137,7 +137,7 @@ public class SendMessages implements Runnable {
         Thread peerThread = new Thread(sendPeer);
         peerThread.start();
 
-        while (Client.isRunning) {
+        while (isRunning) {
             try {
                 sendSnippet();
             } catch (Exception e) {
@@ -145,7 +145,6 @@ public class SendMessages implements Runnable {
                 e.printStackTrace();
             }
         }
-        System.out.println("HELLO");
         peerThread.interrupt();
     }
 }

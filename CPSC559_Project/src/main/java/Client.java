@@ -20,7 +20,6 @@ public class Client {
     private SendMessages msgSender;
     private ArrayList<String> snippets;
 
-    public static volatile boolean isRunning = true;
     public AtomicInteger timeStamp = new AtomicInteger( 0 );
 
     // Prompt for team name
@@ -193,8 +192,8 @@ public class Client {
 
     public void connectToRegistryAgain(String address, int port, String teamName) throws IOException, InterruptedException {
         sock = new Socket(address, port);
-        InputStream input = sock.getInputStream();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+        input = sock.getInputStream();
+        reader = new BufferedReader(new InputStreamReader(input));
         String serverReqMsg = "";
 
         while (!sock.isClosed() && sock.isConnected() && (serverReqMsg = reader.readLine()) != null) {
@@ -222,6 +221,9 @@ public class Client {
                 System.out.println("Report sent to host.");
             } else if (serverReqMsg.equals("close")) {
                 sock.close();
+                reader.close();
+                input.close();
+                return;
             } else if (serverReqMsg.equals("get location")){
                 String clientAddress = sock.getLocalAddress().toString().substring(1);
                 int udpPort = udpServer.getLocalPort();
@@ -246,8 +248,8 @@ public class Client {
         System.out.println("UDP socket setup at " + udpServer.getLocalPort());
 
         sock = new Socket(address, port);
-        InputStream input = sock.getInputStream();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+        input = sock.getInputStream();
+        reader = new BufferedReader(new InputStreamReader(input));
         String serverReqMsg = "";
 
         //PeerCom thread initialize
@@ -279,7 +281,9 @@ public class Client {
                 while (peerComThread.isAlive()) {
                     snippets = peerCom.getSnippets();
                 }
-                System.out.println("CONNECTING AGAIN...");
+                msgSender.isRunning = false;
+                reader.close();
+                input.close();
                 sock.close();
                 connectToRegistryAgain(address, port, teamName);
             } else if (serverReqMsg.equals("get report")) {
@@ -289,6 +293,8 @@ public class Client {
                 sock.getOutputStream().flush();
                 System.out.println("Report sent to host.");
             } else if (serverReqMsg.equals("close")) {
+                reader.close();
+                input.close();
                 sock.close();
             } else if (serverReqMsg.equals("get location")){
                 String clientAddress = sock.getLocalAddress().toString().substring(1);
