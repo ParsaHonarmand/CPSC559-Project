@@ -1,3 +1,5 @@
+// File: SendMessages.java
+// File: Peer.java
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -127,7 +129,7 @@ public class SendMessages implements Runnable {
             while (!interrupted()) {
                 try {
                     sendPeer();
-                    Thread.sleep(80000);
+                    Thread.sleep(30000);
                 } catch (InterruptedException | IOException e) {
                     e.printStackTrace();
                 }
@@ -145,6 +147,7 @@ public class SendMessages implements Runnable {
                 e.printStackTrace();
             }
         }
+        System.out.println("Closing sendMessages Thread");
         peerThread.interrupt();
     }
 }

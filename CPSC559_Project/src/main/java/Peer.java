@@ -1,6 +1,7 @@
+// teamP: Parsa Honarmand, Prit Patel
+// File: Peer.java
 import java.time.LocalDateTime;
 
-// File: Peer.java
 public class Peer {
     private String teamName;
     private String address;

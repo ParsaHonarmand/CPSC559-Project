@@ -1,4 +1,5 @@
 
+// teamP: Parsa Honarmand, Prit Patel
 // File: Client.java
 import java.io.*;
 import java.net.*;
@@ -203,7 +204,7 @@ public class Client {
                 sock.getOutputStream().write(teamName.getBytes());
                 sock.getOutputStream().flush();
             } else if (serverReqMsg.equals("get code")) {
-                String filesText = ".java\n";
+                String filesText = "java\n";
                 sock.getOutputStream().write(filesText.getBytes());
                 sock.getOutputStream().flush();
 
@@ -223,7 +224,7 @@ public class Client {
                 sock.close();
                 reader.close();
                 input.close();
-                return;
+                System.exit(0);
             } else if (serverReqMsg.equals("get location")){
                 String clientAddress = sock.getLocalAddress().toString().substring(1);
                 int udpPort = udpServer.getLocalPort();
@@ -265,7 +266,7 @@ public class Client {
                 sock.getOutputStream().write(teamName.getBytes());
                 sock.getOutputStream().flush();
             } else if (serverReqMsg.equals("get code")) {
-                String filesText = ".java\n";
+                String filesText = "java\n";
                 sock.getOutputStream().write(filesText.getBytes());
                 sock.getOutputStream().flush();
 
