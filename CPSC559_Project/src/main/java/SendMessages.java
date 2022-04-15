@@ -6,10 +6,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Random;
-import java.util.Scanner;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -21,23 +18,25 @@ public class SendMessages implements Runnable {
     DatagramSocket udpSocket;
     String peersSendingLog = ""; 
     ConcurrentHashMap<String, Peer> peers = new ConcurrentHashMap<String, Peer>();
-    ConcurrentHashMap<String, Peer> peersSent = new ConcurrentHashMap<String, Peer>();
+    private List<String> peersSent;
     ConcurrentHashMap<String, Peer> peersSending = new ConcurrentHashMap<String, Peer>();
 
     public AtomicInteger timeStamp;
     public volatile boolean isRunning = true;
+    private int counter = 0;
 
     public SendMessages(ConcurrentHashMap<String, Peer> peersMap, DatagramSocket udpServer, AtomicInteger timeStamp) {
         this.peers = peersMap;
         this.udpSocket = udpServer;
         this.timeStamp = timeStamp;
+        this.peersSent = Collections.synchronizedList(new ArrayList<String>());
     }
 
-    public ConcurrentHashMap<String, Peer> getPeersSent(){ return peersSent; }
+    public List<String> getPeersSent(){ return peersSent; }
 
     public ConcurrentHashMap<String, Peer> getPeersSending(){ return peersSending; }
     public int getPeersSentSize() { return peersSent.size(); }
-
+    public int getCounter() { return counter;}
     public String getPeersSendingLog(){ return peersSendingLog; }
 
     private void sendSnippet() throws java.io.IOException {
@@ -106,14 +105,14 @@ public class SendMessages implements Runnable {
         try{
             udpSocket.send(packetSend);
             addPeerToSendLog(randomSendingPeer, receivingPeer, myDateObj);
-
+            counter++;
             Peer peer = new Peer(
                     randomSendingPeer.getAddress()+":"+randomSendingPeer.getPort(),
                     randomSendingPeer.getAddress(),
                     randomSendingPeer.getPort(),
                     myDateObj);
 
-            peersSent.put(peer.getTeamName(), peer);
+            peersSent.add(peer.getTeamName());
 
 //            udpSocket.close();
         }
